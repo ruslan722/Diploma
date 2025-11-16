@@ -1,0 +1,7 @@
+peewee
+mysql
+mysql-connector
+mysqlclient
+pillow
+requests
+beautifulsoup4
