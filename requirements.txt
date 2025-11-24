@@ -5,3 +5,4 @@ mysqlclient
 pillow
 requests
 beautifulsoup4
+customtkinter
