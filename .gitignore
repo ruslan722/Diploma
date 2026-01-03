@@ -1,3 +1,6 @@
 app_errors.log
 tokens/admin 2_token.txt
 tokens/Admin 3_token.txt
+__pycache__/
+*.pyc
+*.pyo
