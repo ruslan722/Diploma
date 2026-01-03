@@ -938,7 +938,7 @@ def home_window():
     separator.pack(fill='x', side='top')
     
     # --- ОБНОВЛЕННЫЙ СКРОЛЛИНГ (Без следов) ---
-    
+
     # Создаем ScrollableFrame вместо Canvas + Scrollbar
     # Это нативный виджет, который убирает "гостинг" (следы) при прокрутке
     main_scroll_frame = ctk.CTkScrollableFrame(
@@ -946,16 +946,18 @@ def home_window():
         fg_color=SAMURAI_BG,             # Цвет фона контента
         scrollbar_button_color=SAMURAI_RED,      # Цвет ползунка (как в теме)
         scrollbar_button_hover_color=SAMURAI_RED_HOVER, # Цвет при наведении
-        corner_radius=0
+        scrollbar_fg_color=SAMURAI_PANEL,        # Цвет фона полосы скроллбара
+        corner_radius=0,
+        label_fg_color=SAMURAI_BG                # Цвет фона области скроллбара
     )
-    main_scroll_frame.pack(fill='both', expand=True)
+    main_scroll_frame.pack(fill='both', expand=True, padx=0, pady=0)
     
     # --- СОДЕРЖИМОЕ ГЛАВНОЙ СТРАНИЦЫ ---
-    
+
     # Важно: все элементы теперь добавляются в main_scroll_frame
-    
+
     center_container = create_samurai_frame(main_scroll_frame, fg_color=SAMURAI_BG)
-    center_container.pack(expand=True, fill='both', padx=50, pady=20)
+    center_container.pack(expand=True, fill='both', padx=30, pady=20)
     
     # --- ЖИВЫЕ ЧАСЫ ---
     time_frame = create_samurai_frame(center_container, fg_color=SAMURAI_BG)
@@ -1067,8 +1069,8 @@ def home_window():
     vk_btn = create_social_button("content/vk.png", "https://vk.com/huwzan")
     if vk_btn: vk_btn.pack(side='left', padx=20)
 
-    # Пустой блок для отступа снизу
-    ctk.CTkLabel(center_container, text="", height=50).pack()
+    # Пустой блок для отступа снизу и обеспечения минимальной высоты для скроллбара
+    ctk.CTkLabel(center_container, text="", height=100, fg_color=SAMURAI_BG).pack()
 
 # ========== ОКНА С ЦИТАТАМИ ==========
 
