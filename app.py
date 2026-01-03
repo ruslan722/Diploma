@@ -673,7 +673,7 @@ def create_first_admin():
         admin_count = Avtorization.select().where(Avtorization.role == 'администратор').count()
         if admin_count == 0:
             first_admin_username = "admin"
-            first_admin_password = "admin123"
+            first_admin_password = "admin"
             
             try:
                 Avtorization.get(Avtorization.username == first_admin_username)

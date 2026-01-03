@@ -112,7 +112,7 @@ def init_db():
     except Avtorization.DoesNotExist:
         Avtorization.create(
             username="admin",
-            password=hash_password("admin123"),
+            password=hash_password("admin"),
             role='администратор',
             is_main_admin=True
         )
