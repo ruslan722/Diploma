@@ -259,7 +259,7 @@ def is_user_admin(username):
 
 def has_pending_admin_request(username):
     try:
-        AdminRequests.get((AdminRequests.username == username) & (AdminRequests.status == ' ожидание'))
+        AdminRequests.get((AdminRequests.username == username) & (AdminRequests.status == 'ожидание'))
         return True
     except AdminRequests.DoesNotExist: 
         return False
@@ -664,7 +664,7 @@ def show_register_form(parent):
                 
                 AdminRequests.create(
                     username=username,
-                    status=' ожидание'
+                    status='ожидание'
                 )
                 
                 messagebox.showinfo("Успех", 
@@ -1545,8 +1545,8 @@ def load_requests_tab(parent):
                 widget.destroy()
         
         try:
-            pending_requests = AdminRequests.select().where(AdminRequests.status == ' ожидание')
-            
+            pending_requests = AdminRequests.select().where(AdminRequests.status == 'ожидание')
+
             if not pending_requests:
                 create_samurai_label(requests_container, "Нет ожидающих прошений", 
                                    text_color=SAMURAI_TEXT_SECONDARY).pack(pady=20)
