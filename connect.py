@@ -66,6 +66,13 @@ class UserProfile(BaseModel):
     avatar_path = CharField(default='')  # Путь к аватарке
     created_at = DateTimeField(default=datetime.datetime.now)
 
+class AdminActionLog(BaseModel):
+    admin_username = CharField()
+    action_type = CharField()  # 'add_quote', 'edit_quote', 'delete_quote', etc.
+    target_username = CharField()
+    details = TextField()
+    created_at = DateTimeField(default=datetime.datetime.now)
+
 
 # Инициализация и миграция (добавление колонок, если их нет)
 def init_db():
@@ -73,7 +80,7 @@ def init_db():
     # Создаем таблицы
     db.create_tables([
         Motivation, Affirmation, FunnyQuote, Avtorization,
-        AdminRequests, UserReaction, UserProfile
+        AdminRequests, UserReaction, UserProfile, AdminActionLog
     ], safe=True)
     
     # Простая миграция для добавления колонок в существующие таблицы
@@ -105,7 +112,7 @@ def init_db():
     except Avtorization.DoesNotExist:
         Avtorization.create(
             username="admin",
-            password=hash_password("admin"),
+            password=hash_password("admin123"),
             role='администратор',
             is_main_admin=True
         )
