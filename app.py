@@ -16,7 +16,7 @@ from datetime import datetime
 # Импорты вашей логики
 from connect import (
     Avtorization, Motivation, Affirmation, FunnyQuote,
-    AdminRequests, UserReaction, UserProfile, init_db
+    AdminRequests, UserReaction, UserProfile, AdminActionLog, init_db
 )
 
 # ========== КОНФИГУРАЦИЯ САМУРАЙСКОГО СТИЛЯ ==========
@@ -506,13 +506,7 @@ def show_login_form(parent):
             messagebox.showerror("Ошибка", "Неверный код подтверждения")
             refresh_captcha()
             return
-        
-        # Проверка бана
-        if is_user_banned(username):
-            if messagebox.askyesno("Изгнание", "Ваш путь закрыт. Хотите написать прошение сёгуну?"):
-                show_ban_appeal_window(username)
-            return
-        
+
         try:
             user = Avtorization.get(Avtorization.username == username)
             if user.password == hash_password(password):
@@ -679,7 +673,7 @@ def create_first_admin():
         admin_count = Avtorization.select().where(Avtorization.role == 'администратор').count()
         if admin_count == 0:
             first_admin_username = "admin"
-            first_admin_password = "admin123"
+            first_admin_password = "admin"
             
             try:
                 Avtorization.get(Avtorization.username == first_admin_username)
