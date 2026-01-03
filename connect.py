@@ -45,19 +45,6 @@ class AdminRequests(BaseModel):
     reviewed_by = CharField(null=True)
     admin_token = TextField(null=True)
 
-class UserBan(BaseModel):
-    username = CharField(unique=True)
-    banned_by = CharField()
-    ban_date = DateTimeField(default=datetime.datetime.now)
-    ban_reason = TextField()
-    is_active = BooleanField(default=True)
-
-class AdminActionLog(BaseModel):
-    admin_username = CharField()
-    action_type = CharField()
-    target_username = CharField()
-    action_date = DateTimeField(default=datetime.datetime.now)
-    details = TextField()
 
 # --- НОВЫЕ ТАБЛИЦЫ ---
 
@@ -66,28 +53,27 @@ class UserReaction(BaseModel):
     quote_id = IntegerField()
     quote_type = CharField() # 'motivation', 'affirmation', 'funny'
     reaction = CharField()   # 'like' или 'dislike'
-    
+
     class Meta:
         indexes = (
             # Уникальный индекс, чтобы один юзер мог поставить только 1 реакцию на 1 цитату
             (('username', 'quote_id', 'quote_type'), True),
         )
 
-class BanAppeal(BaseModel):
-    username = CharField()
-    message = TextField()
-    admin_recipient = CharField()  # Новое поле для хранения выбранного администратора
-    status = CharField(default='ожидание') # ожидание, рассмотрено
+class UserProfile(BaseModel):
+    username = CharField(unique=True)
+    nickname = CharField(default='')  # Отображаемое имя
+    avatar_path = CharField(default='')  # Путь к аватарке
     created_at = DateTimeField(default=datetime.datetime.now)
+
 
 # Инициализация и миграция (добавление колонок, если их нет)
 def init_db():
     db.connect()
     # Создаем таблицы
     db.create_tables([
-        Motivation, Affirmation, FunnyQuote, Avtorization, 
-        AdminRequests, UserBan, AdminActionLog, 
-        UserReaction, BanAppeal
+        Motivation, Affirmation, FunnyQuote, Avtorization,
+        AdminRequests, UserReaction, UserProfile
     ], safe=True)
     
     # Простая миграция для добавления колонок в существующие таблицы
