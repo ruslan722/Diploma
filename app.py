@@ -15,11 +15,9 @@ from datetime import datetime
 
 # Импорты вашей логики
 from connect import (
-    Avtorization, Motivation, Affirmation, FunnyQuote, 
-    AdminRequests, UserBan, AdminActionLog, 
-    UserReaction, BanAppeal, init_db 
+    Avtorization, Motivation, Affirmation, FunnyQuote,
+    AdminRequests, UserReaction, UserProfile, init_db
 )
-from ban_manager import BanManager
 
 # ========== КОНФИГУРАЦИЯ САМУРАЙСКОГО СТИЛЯ ==========
 ctk.set_appearance_mode("Dark")
@@ -83,8 +81,6 @@ style.map("Treeview",
           background=[('selected', SAMURAI_GOLD)],
           foreground=[('selected', 'black')])
 
-# Менеджер банов
-ban_manager = BanManager()
 
 # Переменные анимации
 loading_window = None
@@ -264,72 +260,64 @@ def has_pending_admin_request(username):
     except AdminRequests.DoesNotExist: 
         return False
 
-def is_user_banned(username): 
-    return ban_manager.is_banned(username)
-
-def can_ban_user(target_username):
-    global current_user
-    if current_user is None: 
-        return False
-    if target_username == current_user['username']: 
-        return False
-    try:
-        target_user = Avtorization.get(Avtorization.username == target_username)
-        current_user_obj = Avtorization.get(Avtorization.username == current_user['username'])
-        if current_user_obj.is_main_admin: 
-            return True
-        if current_user_obj.role == 'администратор' and target_user.role == 'пользователь': 
-            return True
-        return False
-    except Avtorization.DoesNotExist: 
-        return False
-
-def can_unban_user(username):
-    global current_user
-    if current_user is None: 
-        return False
-    if is_main_admin(): 
-        return True
-    try:
-        ban_info = UserBan.get(UserBan.username == username, UserBan.is_active == True)
-        return ban_info.banned_by == current_user['username']
-    except UserBan.DoesNotExist: 
-        return False
-
-def ban_user(username, reason=""):
-    global current_user
-    if current_user is None: 
-        return {"status": "error", "message": "Не авторизован"}
-    if not can_ban_user(username): 
-        return {"status": "error", "message": "Недостаточно прав для изгнания этого воина"}
-    banned_by = current_user['username']
-    success, message = ban_manager.ban_user(username, banned_by, reason)
-    return {"status": "success" if success else "error", "message": message}
-
-def unban_user(username):
-    global current_user
-    if current_user is None: 
-        return {"status": "error", "message": "Не авторизован"}
-    unbanned_by = current_user['username']
-    try:
-        ban_info = UserBan.get(UserBan.username == username, UserBan.is_active == True)
-        if not can_unban_user(username): 
-            return {"status": "error", "message": "Только изгнавший Сёгун или Главный Сёгун может вернуть путь"}
-        success, message = ban_manager.unban_user(username, unbanned_by)
-        return {"status": "success" if success else "error", "message": message}
-    except UserBan.DoesNotExist: 
-        return {"status": "error", "message": "Воин не изгнан или не найден"}
-
 def check_auth():
     global current_user
     if current_user is None:
         show_auth_window()
         return False
-    if is_user_banned(current_user['username']):
-        messagebox.showerror("Изгнание", "Ваш путь закрыт. Обратитесь к сёгуну.")
-        logout()
-        return False
     return True
+
+# ========== ФУНКЦИИ УПРАВЛЕНИЯ ПРОФИЛЕМ ==========
+
+def get_or_create_profile(username):
+    """Получить или создать профиль пользователя"""
+    try:
+        profile = UserProfile.get(UserProfile.username == username)
+        return profile
+    except UserProfile.DoesNotExist:
+        profile = UserProfile.create(username=username, nickname='', avatar_path='')
+        return profile
+
+def update_profile(username, nickname=None, avatar_path=None):
+    """Обновить профиль пользователя"""
+    try:
+        profile = get_or_create_profile(username)
+        if nickname is not None:
+            profile.nickname = nickname
+        if avatar_path is not None:
+            profile.avatar_path = avatar_path
+        profile.save()
+        return True, "Профиль обновлен"
+    except Exception as e:
+        logger.error(f"Ошибка обновления профиля: {e}")
+        return False, str(e)
+
+def get_display_name(username):
+    """Получить отображаемое имя (никнейм или username)"""
+    try:
+        profile = UserProfile.get(UserProfile.username == username)
+        return profile.nickname if profile.nickname else username
+    except UserProfile.DoesNotExist:
+        return username
+
+def save_avatar(username, image_path):
+    """Сохранить аватарку пользователя"""
+    try:
+        if not os.path.exists('avatars'):
+            os.makedirs('avatars')
+
+        # Копируем файл в папку avatars
+        import shutil
+        file_ext = os.path.splitext(image_path)[1]
+        new_path = f"avatars/{username}{file_ext}"
+        shutil.copy2(image_path, new_path)
+
+        # Обновляем профиль
+        update_profile(username, avatar_path=new_path)
+        return True, new_path
+    except Exception as e:
+        logger.error(f"Ошибка сохранения аватарки: {e}")
+        return False, str(e)
 
 # ========== АНИМАЦИЯ ЗАГРУЗКИ ==========
 
@@ -711,96 +699,6 @@ def create_first_admin():
     except Exception as e:
         logger.error(f"Ошибка создания первого администратора: {e}")
 
-def show_ban_appeal_window(username):
-    appeal_win = ctk.CTkToplevel(root)
-    appeal_win.title("Суд чести - Апелляция")
-    appeal_win.geometry("500x550")
-    appeal_win.configure(fg_color=SAMURAI_BG)
-    appeal_win.transient(root)
-    appeal_win.grab_set()
-    
-    # Основной контейнер
-    main_container = create_samurai_frame(appeal_win, fg_color=SAMURAI_BG)
-    main_container.pack(fill='both', expand=True, padx=20, pady=20)
-    
-    create_samurai_label(main_container, f"Воин {username} изгнан", 
-                        font=FONT_HEADER, text_color=SAMURAI_RED).pack(pady=10)
-    
-    # Информация о бане
-    try:
-        ban_info = UserBan.get(UserBan.username == username, UserBan.is_active == True)
-        create_samurai_label(main_container, f"Судья: {ban_info.banned_by}", 
-                            text_color=SAMURAI_TEXT).pack()
-        create_samurai_label(main_container, f"Причина: {ban_info.ban_reason}", 
-                            text_color=SAMURAI_TEXT).pack(pady=5)
-    except UserBan.DoesNotExist:
-        create_samurai_label(main_container, "Записи о бесчестии не найдены", 
-                            text_color=SAMURAI_TEXT).pack()
-    
-    # Выбор администратора
-    create_samurai_label(main_container, "Кому направить прошение:", 
-                        text_color=SAMURAI_GOLD).pack(pady=(20, 5))
-    
-    try:
-        main_admin = Avtorization.get(Avtorization.is_main_admin == True)
-        admin_names = [main_admin.username]
-        
-        ban_info = UserBan.get(UserBan.username == username, UserBan.is_active == True)
-        if ban_info and ban_info.banned_by != main_admin.username:
-            admin_names.append(ban_info.banned_by)
-    except:
-        admin_names = ["admin"]
-
-    admin_combobox = ctk.CTkComboBox(
-        main_container, 
-        values=admin_names,
-        fg_color=SAMURAI_PANEL,
-        border_color=SAMURAI_GOLD,
-        button_color=SAMURAI_RED,
-        dropdown_fg_color=SAMURAI_PANEL,
-        dropdown_text_color=SAMURAI_TEXT
-    )
-    admin_combobox.set(admin_names[0])
-    admin_combobox.pack(pady=5)
-    
-    # Поле для сообщения с скроллбаром
-    create_samurai_label(main_container, "Ваше слово:", 
-                        text_color=SAMURAI_GOLD).pack(pady=(10, 5))
-    
-    # Используем скроллируемое текстовое поле
-    msg_text = create_scrollable_textbox(main_container, height=150, width=460)
-    msg_text.pack(fill='x', pady=5)
-    
-    def send_appeal():
-        msg = msg_text.get("1.0", "end").strip()
-        if not msg:
-            messagebox.showerror("Ошибка", "Напишите ваше слово")
-            return
-        
-        selected_admin = admin_combobox.get()
-        if not selected_admin:
-            messagebox.showerror("Ошибка", "Выберите судью")
-            return
-        
-        try:
-            BanAppeal.create(
-                username=username,
-                message=msg,
-                admin_recipient=selected_admin
-            )
-            messagebox.showinfo("Отправлено", f"Ваше прошение отправлено {selected_admin}.")
-            appeal_win.destroy()
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось отправить прошение: {str(e)}")
-    
-    # Кнопки
-    btn_frame = create_samurai_frame(appeal_win, fg_color=SAMURAI_BG)
-    btn_frame.pack(side='bottom', pady=20)
-    
-    create_samurai_button(btn_frame, "Отправить прошение", send_appeal).pack(side='left', padx=10)
-    create_samurai_button(btn_frame, "Отмена", appeal_win.destroy, 
-                         color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
-
 def complete_admin_registration_window(username):
     complete_win = ctk.CTkToplevel(root)
     complete_win.title("Посвящение в Сёгуны")
@@ -864,8 +762,116 @@ def complete_admin_registration_window(username):
     create_samurai_label(info_frame, token_filename, 
                         text_color=SAMURAI_GOLD, font=('Segoe UI', 10)).pack()
     
-    create_samurai_label(main_frame, "Если свиток утерян, обратитесь к главному Сёгуну", 
+    create_samurai_label(main_frame, "Если свиток утерян, обратитесь к главному Сёгуну",
                         text_color=SAMURAI_RED, font=('Segoe UI', 9)).pack(pady=10)
+
+def show_profile_settings():
+    """Окно настроек профиля"""
+    if not check_auth():
+        return
+
+    global current_user
+    profile_win = ctk.CTkToplevel(root)
+    profile_win.title("Настройки профиля")
+    profile_win.geometry("600x500")
+    profile_win.configure(fg_color=SAMURAI_BG)
+    profile_win.transient(root)
+    profile_win.grab_set()
+
+    main_container = create_samurai_frame(profile_win, fg_color=SAMURAI_BG)
+    main_container.pack(fill='both', expand=True, padx=20, pady=20)
+
+    create_samurai_label(main_container, "Настройки профиля",
+                        font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(pady=10)
+
+    # Получаем текущий профиль
+    profile = get_or_create_profile(current_user['username'])
+
+    # Аватар
+    avatar_frame = create_samurai_frame(main_container, fg_color=SAMURAI_PANEL, border_color=SAMURAI_GOLD)
+    avatar_frame.pack(fill='x', pady=10)
+
+    create_samurai_label(avatar_frame, "Аватар:",
+                        font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w', padx=10, pady=5)
+
+    avatar_display_frame = create_samurai_frame(avatar_frame, fg_color=SAMURAI_BG)
+    avatar_display_frame.pack(pady=10)
+
+    # Лейбл для отображения аватара
+    avatar_label = ctk.CTkLabel(avatar_display_frame, text="", fg_color=SAMURAI_PANEL)
+    avatar_label.pack(pady=5)
+
+    # Функция для отображения аватара
+    def display_avatar():
+        if profile.avatar_path and os.path.exists(profile.avatar_path):
+            try:
+                img = Image.open(profile.avatar_path)
+                img = img.resize((150, 150), Image.Resampling.LANCZOS)
+                ctk_image = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
+                avatar_label.configure(image=ctk_image, text="")
+                avatar_label.image = ctk_image
+            except Exception as e:
+                logger.error(f"Ошибка загрузки аватара: {e}")
+                avatar_label.configure(text="[Нет аватара]", image=None)
+        else:
+            avatar_label.configure(text="[Нет аватара]", image=None)
+
+    display_avatar()
+
+    # Кнопка загрузки аватара
+    def upload_avatar():
+        from tkinter import filedialog
+        file_path = filedialog.askopenfilename(
+            title="Выберите изображение",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp")]
+        )
+        if file_path:
+            success, result = save_avatar(current_user['username'], file_path)
+            if success:
+                messagebox.showinfo("Успех", "Аватар обновлен")
+                # Обновляем профиль
+                nonlocal profile
+                profile = get_or_create_profile(current_user['username'])
+                display_avatar()
+            else:
+                messagebox.showerror("Ошибка", f"Не удалось сохранить аватар: {result}")
+
+    create_samurai_button(avatar_frame, "Загрузить аватар", upload_avatar).pack(pady=10)
+
+    # Никнейм
+    nickname_frame = create_samurai_frame(main_container, fg_color=SAMURAI_PANEL, border_color=SAMURAI_GOLD)
+    nickname_frame.pack(fill='x', pady=10)
+
+    create_samurai_label(nickname_frame, "Отображаемое имя (никнейм):",
+                        font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w', padx=10, pady=5)
+
+    create_samurai_label(nickname_frame, "Оставьте пустым для использования логина",
+                        text_color=SAMURAI_TEXT_SECONDARY, font=('Segoe UI', 9)).pack(anchor='w', padx=10)
+
+    nickname_entry = create_samurai_entry(nickname_frame, width=400)
+    nickname_entry.pack(padx=10, pady=10)
+    nickname_entry.insert(0, profile.nickname if profile.nickname else "")
+
+    # Кнопки действий
+    buttons_frame = create_samurai_frame(main_container, fg_color=SAMURAI_BG)
+    buttons_frame.pack(pady=20)
+
+    def save_changes():
+        new_nickname = nickname_entry.get().strip()
+        success, message = update_profile(current_user['username'], nickname=new_nickname)
+        if success:
+            messagebox.showinfo("Успех", "Профиль обновлен")
+            profile_win.destroy()
+            # Обновляем главное окно если оно открыто
+            home_window()
+        else:
+            messagebox.showerror("Ошибка", message)
+
+    create_samurai_button(buttons_frame, "Сохранить", save_changes,
+                         color=SAMURAI_GREEN, hover_color=SAMURAI_GREEN_HOVER).pack(side='left', padx=10)
+
+    create_samurai_button(buttons_frame, "Отмена", profile_win.destroy,
+                         color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
 
 # ========== ГЛАВНОЕ ОКНО ==========
 
@@ -924,14 +930,19 @@ def home_window():
     # Пользователь
     user_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     user_frame.pack(side='right', padx=20, pady=10)
-    
-    create_samurai_label(user_frame, current_user['username'], 
+
+    # Отображаем никнейм если есть, иначе username
+    display_name = get_display_name(current_user['username'])
+    create_samurai_label(user_frame, display_name,
                         font=FONT_BOLD, text_color=SAMURAI_GOLD).pack(side='left', padx=10)
-    
+
+    create_samurai_button(user_frame, "Профиль", show_profile_settings,
+                         color=SAMURAI_GREEN, hover_color=SAMURAI_GREEN_HOVER, width=80).pack(side='left', padx=5)
+
     create_samurai_button(user_frame, "Выйти", logout, width=80).pack(side='left', padx=5)
-    
+
     if current_user['role'] == 'администратор':
-        create_samurai_button(user_frame, "Сёгун", developer_window, 
+        create_samurai_button(user_frame, "Сёгун", developer_window,
                              color=SAMURAI_RED, width=80).pack(side='left', padx=5)
     
     separator = ctk.CTkFrame(root, height=2, fg_color=SAMURAI_GOLD, corner_radius=0)
@@ -1420,85 +1431,12 @@ def developer_window():
     # Добавляем вкладки
     if is_main_admin():
         tabview.add("Заявки")
-        tabview.add("Летопись") # Новая вкладка для логов
-        
-    tabview.add("Баны")
-    tabview.add("Апелляции")
-    
+
     # Загружаем содержимое вкладок
     if is_main_admin():
         load_requests_tab(tabview.tab("Заявки"))
-        load_logs_tab(tabview.tab("Летопись")) # Загрузка логов
-        
-    load_bans_tab(tabview.tab("Баны"))
-    load_appeals_tab(tabview.tab("Апелляции"))
     
     create_samurai_button(main_frame, "Закрыть", dev_win.destroy).pack(pady=10)
-
-def load_logs_tab(parent):
-    """Загрузка логов действий администраторов"""
-    create_samurai_label(parent, "Действия Сёгунов:", 
-                       font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(anchor='w', pady=(0, 10))
-    
-    # Контейнер для таблицы
-    table_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
-    table_frame.pack(fill='both', expand=True)
-    
-    # Настройка колонок
-    columns = ("date", "admin", "action", "target", "details")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=20)
-    
-    tree.heading("date", text="Дата")
-    tree.heading("admin", text="Сёгун")
-    tree.heading("action", text="Действие")
-    tree.heading("target", text="Цель")
-    tree.heading("details", text="Детали")
-    
-    tree.column("date", width=150)
-    tree.column("admin", width=100)
-    tree.column("action", width=100)
-    tree.column("target", width=100)
-    tree.column("details", width=300)
-    
-    # Скроллбар
-    scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    
-    tree.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
-    
-    # === ИСПРАВЛЕНИЕ СКРОЛЛИНГА ===
-    setup_touchpad_scrolling(tree)
-    # ==============================
-
-    def refresh_logs():
-        for item in tree.get_children():
-            tree.delete(item)
-            
-        try:
-            # Получаем последние 100 действий
-            logs = AdminActionLog.select().order_by(AdminActionLog.action_date.desc()).limit(100)
-            
-            for log in logs:
-                date_str = log.action_date.strftime("%d.%m.%Y %H:%M")
-                
-                # Раскраска действий (опционально через теги, но пока просто текст)
-                tree.insert("", "end", values=(
-                    date_str,
-                    log.admin_username,
-                    log.action_type,
-                    log.target_username,
-                    log.details
-                ))
-        except Exception as e:
-            logger.error(f"Ошибка загрузки логов: {e}")
-            
-    # Кнопка обновления
-    btn_frame = create_samurai_frame(parent, fg_color="transparent")
-    btn_frame.pack(fill='x', pady=5)
-    create_samurai_button(btn_frame, "Обновить летопись", refresh_logs, width=200).pack(side='right')
-    
-    refresh_logs()
 
 def load_requests_tab(parent):
     """Загрузка вкладки управления заявками"""
@@ -1622,269 +1560,6 @@ def load_requests_tab(parent):
     
     create_samurai_button(parent, "Обновить прошения", load_requests).pack(pady=10)
     load_requests()
-
-def load_bans_tab(parent):
-    """Загрузка вкладки управления банами"""
-    create_samurai_label(parent, "Управление изгнаниями", 
-                       font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(anchor='w', pady=(0, 10))
-    
-    # Форма бана
-    ban_form_frame = create_samurai_frame(parent, fg_color=SAMURAI_PANEL)
-    ban_form_frame.pack(fill='x', pady=10)
-    
-    create_samurai_label(ban_form_frame, "Изгнать воина:", 
-                       font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w', padx=10, pady=5)
-    
-    ban_input_frame = create_samurai_frame(ban_form_frame, fg_color=SAMURAI_PANEL)
-    ban_input_frame.pack(fill='x', padx=10, pady=5)
-    
-    create_samurai_label(ban_input_frame, "Имя воина:", 
-                       text_color=SAMURAI_TEXT).pack(side='left', padx=5)
-    
-    # Получаем список пользователей для бана
-    def get_users_for_ban():
-        try:
-            users = Avtorization.select().where(
-                (Avtorization.username != current_user['username'])  # Исключаем себя
-            )
-            
-            # Фильтруем по правам
-            available_users = []
-            for user in users:
-                if can_ban_user(user.username):
-                    available_users.append(user.username)
-                    
-            return available_users
-        except Exception as e:
-            logger.error(f"Ошибка получения списка пользователей: {e}")
-            return []
-    
-    ban_user_combobox = ctk.CTkComboBox(
-        ban_input_frame,
-        values=get_users_for_ban(),
-        fg_color=SAMURAI_PANEL,
-        border_color=SAMURAI_GOLD,
-        button_color=SAMURAI_RED,
-        dropdown_fg_color=SAMURAI_PANEL,
-        dropdown_text_color=SAMURAI_TEXT,
-        width=200
-    )
-    if get_users_for_ban():
-        ban_user_combobox.set(get_users_for_ban()[0])
-    ban_user_combobox.pack(side='left', padx=5)
-    
-    create_samurai_label(ban_input_frame, "Причина:", 
-                       text_color=SAMURAI_TEXT).pack(side='left', padx=5)
-    ban_reason_entry = create_samurai_entry(ban_input_frame, width=200)
-    ban_reason_entry.pack(side='left', padx=5)
-    ban_reason_entry.insert(0, "Нарушение кодекса")
-    
-    def refresh_ban_users():
-        """Обновить список пользователей для бана"""
-        ban_user_combobox.configure(values=get_users_for_ban())
-        if get_users_for_ban():
-            ban_user_combobox.set(get_users_for_ban()[0])
-    
-    def perform_ban():
-        username = ban_user_combobox.get().strip()
-        reason = ban_reason_entry.get().strip()
-        
-        if not username:
-            messagebox.showerror("Ошибка", "Выберите воина для изгнания")
-            return
-        
-        result = ban_user(username, reason)
-        if result["status"] == "success":
-            messagebox.showinfo("Успех", f"Воин {username} изгнан\nПричина: {reason}")
-            refresh_ban_users()  # Обновляем список после бана
-            update_banned_list()
-        else:
-            messagebox.showerror("Ошибка", result["message"])
-    
-    create_samurai_button(ban_input_frame, "Изгнать", perform_ban).pack(side='left', padx=10)
-    create_samurai_button(ban_input_frame, "Обновить список", refresh_ban_users, 
-                         color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=5)
-    
-    # Список изгнанных
-    create_samurai_label(parent, "Изгнанные воины:", 
-                       font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w', pady=(20, 10))
-    
-    banned_container = ctk.CTkScrollableFrame(parent, fg_color=SAMURAI_BG)
-    banned_container.pack(fill='both', expand=True)
-    
-    def update_banned_list():
-        for widget in banned_container.winfo_children():
-            if widget.winfo_exists():
-                widget.destroy()
-        
-        try:
-            active_bans = UserBan.select().where(UserBan.is_active == True)
-            
-            if not active_bans:
-                create_samurai_label(banned_container, "Нет изгнанных воинов", 
-                                   text_color=SAMURAI_TEXT_SECONDARY).pack(pady=20)
-                return
-            
-            for ban in active_bans:
-                ban_frame = create_samurai_frame(banned_container, border_color=SAMURAI_RED)
-                ban_frame.pack(fill='x', pady=2, padx=5)
-                
-                info_frame = create_samurai_frame(ban_frame, fg_color=SAMURAI_PANEL)
-                info_frame.pack(fill='x', padx=10, pady=5)
-                
-                create_samurai_label(info_frame, f"Воин: {ban.username}", 
-                                   font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w')
-                create_samurai_label(info_frame, f"Изгнан Сёгуном: {ban.banned_by}", 
-                                   text_color=SAMURAI_TEXT_SECONDARY).pack(anchor='w')
-                create_samurai_label(info_frame, f"Причина: {ban.ban_reason}", 
-                                   text_color=SAMURAI_TEXT_SECONDARY).pack(anchor='w')
-                
-                ban_date = ban.ban_date.strftime("%d.%m.%Y %H:%M") if ban.ban_date else "Неизвестно"
-                create_samurai_label(info_frame, f"Дата изгнания: {ban_date}", 
-                                   text_color=SAMURAI_TEXT_SECONDARY).pack(anchor='w')
-                
-                btn_frame = create_samurai_frame(ban_frame, fg_color=SAMURAI_PANEL)
-                btn_frame.pack(fill='x', padx=10, pady=5)
-                
-                def perform_unban(unban_username=ban.username):
-                    result = unban_user(unban_username)
-                    if result["status"] == "success":
-                        messagebox.showinfo("Успех", result["message"])
-                        update_banned_list()
-                    else:
-                        messagebox.showerror("Ошибка", result["message"])
-                
-                # Показываем кнопку разбана только если есть права
-                if can_unban_user(ban.username):
-                    create_samurai_button(
-                        btn_frame, 
-                        "Вернуть путь", 
-                        perform_unban,
-                        color=SAMURAI_GREEN,
-                        hover_color=SAMURAI_GREEN_HOVER,
-                        width=120
-                    ).pack(side='right', padx=5)
-                else:
-                    # Показываем серую неактивную кнопку
-                    create_samurai_button(
-                        btn_frame, 
-                        "Нет прав для возврата", 
-                        None,
-                        color=SAMURAI_PANEL,
-                        hover_color=SAMURAI_PANEL,
-                        text_color=SAMURAI_TEXT_SECONDARY,
-                        width=120
-                    ).pack(side='right', padx=5)
-        
-        except Exception as e:
-            logger.error(f"Ошибка загрузки изгнанных: {e}")
-            create_samurai_label(
-                banned_container, 
-                f"Ошибка загрузки: {str(e)}", 
-                text_color=SAMURAI_RED
-            ).pack(pady=20)
-    
-    create_samurai_button(parent, "Обновить список", update_banned_list).pack(pady=10)
-    update_banned_list()
-
-def load_appeals_tab(parent):
-    """Загрузка вкладки апелляций"""
-    create_samurai_label(parent, "Прошения изгнанных:", 
-                       font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(anchor='w', pady=(0, 10))
-    
-    appeals_container = ctk.CTkScrollableFrame(parent, fg_color=SAMURAI_BG)
-    appeals_container.pack(fill='both', expand=True)
-    
-    def refresh_appeals():
-        # Проверяем существование контейнера
-        if not appeals_container or not appeals_container.winfo_exists():
-            return
-            
-        for widget in appeals_container.winfo_children():
-            if widget.winfo_exists():
-                widget.destroy()
-            
-        try:
-            # Главный сёгун видит все апелляции
-            if is_main_admin():
-                appeals = BanAppeal.select().where(BanAppeal.status == 'ожидание')
-            else:
-                # Обычные сёгуны видят апелляции, адресованные им
-                appeals = BanAppeal.select().where(
-                    (BanAppeal.status == 'ожидание') & 
-                    (BanAppeal.admin_recipient == current_user['username'])
-                )
-            
-            if not appeals:
-                if appeals_container.winfo_exists():
-                    create_samurai_label(appeals_container, "Нет ожидающих прошений", 
-                                       text_color=SAMURAI_TEXT_SECONDARY).pack(pady=20)
-                return
-            
-            for appeal in appeals:
-                if not appeals_container.winfo_exists():
-                    break
-                    
-                appeal_frame = create_samurai_frame(appeals_container, border_color=SAMURAI_GOLD)
-                appeal_frame.pack(fill='x', pady=5)
-                
-                create_samurai_label(appeal_frame, f"От: {appeal.username} ({appeal.created_at})", 
-                                   font=FONT_BOLD, text_color=SAMURAI_TEXT).pack(anchor='w', padx=10, pady=5)
-                
-                admin_recipient = getattr(appeal, 'admin_recipient', 'Не указан')
-                create_samurai_label(appeal_frame, f"Сёгуну: {admin_recipient}", 
-                                   text_color=SAMURAI_TEXT_SECONDARY).pack(anchor='w', padx=10)
-                
-                create_samurai_label(appeal_frame, f"Слово: {appeal.message}", 
-                                   text_color=SAMURAI_TEXT).pack(anchor='w', padx=10, pady=2)
-                
-                btn_frame = create_samurai_frame(appeal_frame, fg_color=SAMURAI_PANEL)
-                btn_frame.pack(fill='x', padx=10, pady=5)
-                
-                def mark_read(a=appeal):
-                    a.status = 'рассмотрено'
-                    a.save()
-                    refresh_appeals()
-                
-                def unban_from_appeal(u=appeal.username, a=appeal):
-                    result = unban_user(u)
-                    if result["status"] == "success":
-                        a.status = 'одобрено'
-                        a.save()
-                        messagebox.showinfo("Успех", f"{u} возвращен на путь")
-                        refresh_appeals()
-                    else:
-                        messagebox.showerror("Ошибка", result["message"])
-
-                create_samurai_button(
-                    btn_frame, 
-                    "Вернуть путь", 
-                    unban_from_appeal,
-                    color=SAMURAI_GREEN,
-                    hover_color=SAMURAI_GREEN_HOVER,
-                    width=120
-                ).pack(side='left', padx=5)
-                
-                create_samurai_button(
-                    btn_frame, 
-                    "Прочитано", 
-                    mark_read,
-                    color=SAMURAI_PANEL,
-                    hover_color="#333",
-                    width=120
-                ).pack(side='left', padx=5)
-                
-        except Exception as e:
-            logger.error(f"Ошибка загрузки прошений: {e}")
-            if appeals_container.winfo_exists():
-                create_samurai_label(
-                    appeals_container, 
-                    f"Ошибка загрузки: {str(e)}", 
-                    text_color=SAMURAI_RED
-                ).pack(pady=20)
-
-    create_samurai_button(parent, "Обновить прошения", refresh_appeals).pack(pady=10)
-    refresh_appeals()
 
 # ========== ФУНКЦИИ УПРАВЛЕНИЯ КОНТЕНТОМ ==========
 
