@@ -927,6 +927,18 @@ def home_window():
     user_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     user_frame.pack(side='right', padx=20, pady=10)
 
+    # Аватар пользователя
+    profile = get_or_create_profile(current_user['username'])
+    if profile.avatar_path and os.path.exists(profile.avatar_path):
+        try:
+            avatar_img = Image.open(profile.avatar_path)
+            avatar_img = avatar_img.resize((35, 35), Image.Resampling.LANCZOS)
+            avatar_ctk = ctk.CTkImage(light_image=avatar_img, dark_image=avatar_img, size=(35, 35))
+            avatar_label = ctk.CTkLabel(user_frame, image=avatar_ctk, text="")
+            avatar_label.pack(side='left', padx=(0, 5))
+        except Exception as e:
+            logger.error(f"Ошибка загрузки аватара в навбаре: {e}")
+
     # Отображаем никнейм если есть, иначе username
     display_name = get_display_name(current_user['username'])
     create_samurai_label(user_frame, display_name,
@@ -1148,10 +1160,24 @@ def show_quote_window(quote_type, title, ModelClass):
     
     user_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     user_frame.pack(side='right', padx=20, pady=10)
-    
-    create_samurai_label(user_frame, current_user['username'], 
+
+    # Аватар пользователя
+    profile = get_or_create_profile(current_user['username'])
+    if profile.avatar_path and os.path.exists(profile.avatar_path):
+        try:
+            avatar_img = Image.open(profile.avatar_path)
+            avatar_img = avatar_img.resize((35, 35), Image.Resampling.LANCZOS)
+            avatar_ctk = ctk.CTkImage(light_image=avatar_img, dark_image=avatar_img, size=(35, 35))
+            avatar_label = ctk.CTkLabel(user_frame, image=avatar_ctk, text="")
+            avatar_label.pack(side='left', padx=(0, 5))
+        except Exception as e:
+            logger.error(f"Ошибка загрузки аватара в навбаре: {e}")
+
+    # Отображаем никнейм если есть, иначе username
+    display_name = get_display_name(current_user['username'])
+    create_samurai_label(user_frame, display_name,
                         font=FONT_BOLD, text_color=SAMURAI_GOLD).pack(side='left', padx=10)
-    
+
     create_samurai_button(user_frame, "Выйти", logout, width=80).pack(side='left', padx=5)
     
     if current_user['role'] == 'администратор':
