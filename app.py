@@ -767,12 +767,14 @@ def show_profile_settings():
     global current_user
     profile_win = ctk.CTkToplevel(root)
     profile_win.title("Настройки профиля")
-    profile_win.geometry("600x500")
+    profile_win.geometry("650x600")
     profile_win.configure(fg_color=SAMURAI_BG)
     profile_win.transient(root)
     profile_win.grab_set()
 
-    main_container = create_samurai_frame(profile_win, fg_color=SAMURAI_BG)
+    # Создаем прокручиваемый контейнер
+    main_container = ctk.CTkScrollableFrame(profile_win, fg_color=SAMURAI_BG,
+                                           border_width=0, corner_radius=0)
     main_container.pack(fill='both', expand=True, padx=20, pady=20)
 
     create_samurai_label(main_container, "Настройки профиля",
