@@ -1,3 +1,4 @@
+# app.py
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox, Menu, ttk, scrolledtext, filedialog
@@ -12,26 +13,26 @@ import random
 import string
 from datetime import datetime
 
-
+# Импорты вашей логики
 from connect import (
     Avtorization, Motivation, Affirmation, FunnyQuote,
     AdminRequests, UserReaction, UserProfile, AdminActionLog, init_db,
     Category, CategoryQuote
 )
 
-
+# ========== ФУНКЦИИ ДЛЯ ПОЛНОЭКРАННОГО РЕЖИМА ==========
 def set_fullscreen(window):
     """Устанавливает полноэкранный режим для окна"""
     try:
-    
+        # Для Windows
         if os.name == 'nt':
             window.state('zoomed')
-        
+        # Для Linux/Mac
         else:
             window.attributes('-fullscreen', True)
     except Exception as e:
         logging.error(f"Ошибка установки полноэкранного режима: {e}")
-        
+        # Если не получается, просто максимизируем
         try:
             window.state('zoomed')
         except:
@@ -53,11 +54,11 @@ def toggle_fullscreen(event=None):
     except Exception as e:
         logging.error(f"Ошибка переключения полноэкранного режима: {e}")
 
-
+# ========== КОНФИГУРАЦИЯ САМУРАЙСКОГО СТИЛЯ ==========
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
-
+# Цветовая палитра самурайской темы
 SAMURAI_BG = "#0d0d0d"           
 SAMURAI_PANEL = "#1a1a1a"        
 SAMURAI_CARD = "#262626"         
@@ -70,13 +71,13 @@ SAMURAI_TEXT_SECONDARY = "#A0A0A0"
 SAMURAI_GREEN = "#2E8B57"        
 SAMURAI_GREEN_HOVER = "#3e6b3f"  
 
-
+# Настройка шрифтов
 FONT_PRIMARY = ("Segoe UI", 12)
 FONT_BOLD = ("Segoe UI", 12, "bold")
 FONT_TITLE = ("Segoe UI", 20, "bold")
 FONT_HEADER = ("Segoe UI", 16, "bold")
 
-
+# Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -87,22 +88,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
+# Глобальные переменные
 current_user = None
 active_windows = {}
 
-
+# Инициализация корневого окна
 root = ctk.CTk()
 root.title('Bushido Motivation System')
 root.configure(fg_color=SAMURAI_BG)
 
-
+# Устанавливаем полноэкранный режим
 set_fullscreen(root)
 
-
+# Привязываем клавишу Escape для выхода из полноэкранного режима
 root.bind('<Escape>', toggle_fullscreen)
 
-
+# Настройка стилей для ttk виджетов (Treeview и т.д.)
 style = ttk.Style()
 style.theme_use("clam")
 style.configure("Treeview", 
@@ -120,7 +121,7 @@ style.map("Treeview",
           background=[('selected', SAMURAI_GOLD)],
           foreground=[('selected', 'black')])
 
-
+# Переменные анимации
 loading_window = None
 loading_progress = None
 loading_label = None
@@ -128,7 +129,7 @@ loading_canvas = None
 loading_frames = []
 loading_animation_id = None
 
-
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ СТИЛЯ ==========
 
 def create_samurai_button(parent, text, command=None, color=SAMURAI_RED, hover_color=SAMURAI_RED_HOVER, 
                          text_color="white", width=140, height=35, font=FONT_BOLD):
@@ -188,7 +189,7 @@ def create_samurai_frame(parent, fg_color=SAMURAI_PANEL, border_color=None, **kw
 def create_samurai_progressbar(parent, width=300):
     return ctk.CTkProgressBar(parent, width=width, height=15, progress_color=SAMURAI_RED, fg_color=SAMURAI_PANEL, corner_radius=0)
 
-
+# --- ФУНКЦИЯ ДЛЯ СКРОЛЛИНГА TREEVIEW ---
 def setup_touchpad_scrolling(widget):
     """Включает прокрутку тачпадом для ttk виджетов"""
     def _on_mousewheel(event):
@@ -215,7 +216,7 @@ def setup_touchpad_scrolling(widget):
     widget.bind('<Enter>', _bind_to_mousewheel)
     widget.bind('<Leave>', _unbind_from_mousewheel)
 
-
+# ========== ФУНКЦИОНАЛЬНЫЕ ФУНКЦИИ ==========
 
 def generate_captcha_text():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
@@ -247,7 +248,7 @@ def safe_widget_update(widget, method, *args, **kwargs):
     except Exception as e: logger.warning(f"Не удалось обновить виджет {widget}: {str(e)}")
     return False
 
-
+# ========== ФУНКЦИИ АВТОРИЗАЦИИ И БЕЗОПАСНОСТИ ==========
 
 def hash_password(password): 
     return hashlib.sha256(password.encode()).hexdigest()
@@ -304,7 +305,7 @@ def check_auth():
         return False
     return True
 
-
+# ========== ФУНКЦИИ УПРАВЛЕНИЯ ПРОФИЛЕМ ==========
 
 def get_or_create_profile(username):
     """Получить или создать профиль пользователя"""
@@ -330,7 +331,7 @@ def update_profile(username, nickname=None, avatar_path=None):
         return False, str(e)
 
 def get_display_name(username):
-    """Получить отображаемое имя """
+    """Получить отображаемое имя (никнейм или username)"""
     try:
         profile = UserProfile.get(UserProfile.username == username)
         return profile.nickname if profile.nickname else username
@@ -354,7 +355,7 @@ def save_avatar(username, image_path):
         logger.error(f"Ошибка сохранения аватарки: {e}")
         return False, str(e)
 
-
+# ========== АНИМАЦИЯ ЗАГРУЗКИ ==========
 
 def load_gif_frames():
     global loading_frames
@@ -441,33 +442,33 @@ def show_loading_screen(target_function, *args):
 
     play_animation()
 
-
+# ========== ФУНКЦИИ ДЛЯ ОБНОВЛЕНИЯ НАВИГАЦИИ ==========
 
 def update_nav_user_info(nav_frame):
     """Обновляет информацию о пользователе в навигационной панели"""
-    
+    # Ищем user_frame (он должен быть упакован с side='right')
     user_frame = None
     for widget in nav_frame.winfo_children():
         if isinstance(widget, ctk.CTkFrame) and widget.cget("fg_color") == "transparent":
-            
+            # Проверяем, находится ли фрейм справа
             pack_info = widget.pack_info()
             if pack_info.get('side') == 'right':
                 user_frame = widget
                 break
     
     if user_frame:
-        
+        # Очищаем user_frame
         for child in user_frame.winfo_children():
             child.destroy()
         
         display_name = get_display_name(current_user['username'])
         profile = get_or_create_profile(current_user['username'])
         
-        
+        # Контейнер для аватарки и имени
         user_info_container = ctk.CTkFrame(user_frame, fg_color="transparent")
         user_info_container.pack(side='left', padx=10)
         
-        
+        # Имя пользователя
         name_label = create_samurai_label(
             user_info_container, 
             display_name,
@@ -476,7 +477,7 @@ def update_nav_user_info(nav_frame):
         )
         name_label.pack(side='left')
         
-        
+        # Аватарка
         avatar_label = ctk.CTkLabel(user_info_container, text="", width=30, height=30)
         avatar_label.pack(side='left', padx=(5, 0))
         
@@ -493,7 +494,7 @@ def update_nav_user_info(nav_frame):
         else:
             avatar_label.configure(text="👤", font=("Segoe UI", 16))
         
-        
+        # Кнопки (справа от имени и аватарки)
         if current_user['role'] == 'администратор':
             create_samurai_button(
                 user_frame, "Сёгун", 
@@ -521,7 +522,7 @@ def create_navigation_bar(parent, active_tab=None):
     nav_frame = create_samurai_frame(parent, fg_color="black")
     nav_frame.pack(fill='x', side='top')
     
-    
+    # Логотип слева
     logo_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     logo_frame.pack(side='left', padx=20, pady=10)
     
@@ -535,7 +536,7 @@ def create_navigation_bar(parent, active_tab=None):
     
     create_samurai_label(logo_frame, "BUSHIDO", font=("Impact", 24), text_color=SAMURAI_RED).pack(side='left', padx=5)
     
-    
+    # Навигационные кнопки по центру
     nav_buttons_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     nav_buttons_frame.pack(side='left', padx=50, pady=10, expand=True)
     
@@ -561,15 +562,16 @@ def create_navigation_bar(parent, active_tab=None):
     create_nav_button("Мотивация", lambda: show_loading_screen(motivation_window), active_tab == 'motivation').pack(side='left', padx=5)
     create_nav_button("Аффирмации", lambda: show_loading_screen(affirmation_window), active_tab == 'affirmation').pack(side='left', padx=5)
     create_nav_button("Юмор", lambda: show_loading_screen(funny_quotes_window), active_tab == 'funny').pack(side='left', padx=5)
+    # Кнопка категорий
     create_nav_button("Категории", lambda: show_loading_screen(categories_main_window), active_tab == 'categories').pack(side='left', padx=5)
     
-    
+    # Контейнер для пользователя (справа)
     user_frame = create_samurai_frame(nav_frame, fg_color="transparent")
     user_frame.pack(side='right', padx=20, pady=10)
     
     return nav_frame, user_frame
 
-
+# ========== ОКНО АВТОРИЗАЦИИ ==========
 
 def show_auth_window():
     create_first_admin()
@@ -840,7 +842,7 @@ def complete_admin_registration_window(username):
     complete_win.transient(root)
     complete_win.grab_set()
     
-
+    # Устанавливаем полноэкранный режим
     set_fullscreen(complete_win)
     
     main_frame = create_samurai_frame(complete_win, fg_color=SAMURAI_BG)
@@ -900,7 +902,7 @@ def complete_admin_registration_window(username):
     create_samurai_label(main_frame, "Если свиток утерян, обратитесь к главному Сёгуну",
                         text_color=SAMURAI_RED, font=('Segoe UI', 9)).pack(pady=10)
 
-
+# ========== НАСТРОЙКИ ПРОФИЛЯ ==========
 
 def show_profile_settings():
     """Окно настроек профиля"""
@@ -915,7 +917,7 @@ def show_profile_settings():
     profile_win.transient(root)
     profile_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(profile_win)
 
     main_container = ctk.CTkScrollableFrame(profile_win, fg_color=SAMURAI_BG,
@@ -968,7 +970,7 @@ def show_profile_settings():
                 profile = get_or_create_profile(current_user['username'])
                 display_avatar()
                 
-
+                # Обновляем навигационную панель
                 for widget in root.winfo_children():
                     if isinstance(widget, ctk.CTkFrame) and widget.cget("fg_color") == "black":
                         update_nav_user_info(widget)
@@ -1000,7 +1002,7 @@ def show_profile_settings():
         if success:
             messagebox.showinfo("Успех", "Профиль обновлен")
             profile_win.destroy()
-            
+            # Обновляем навигационную панель
             for widget in root.winfo_children():
                 if isinstance(widget, ctk.CTkFrame) and widget.cget("fg_color") == "black":
                     update_nav_user_info(widget)
@@ -1014,7 +1016,7 @@ def show_profile_settings():
     create_samurai_button(buttons_frame, "Отмена", profile_win.destroy,
                          color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
 
-
+# ========== ГЛАВНОЕ ОКНО ==========
 
 def home_window():
     if not check_auth():
@@ -1023,7 +1025,7 @@ def home_window():
     for widget in root.winfo_children():
         widget.destroy()
     
-    
+    # Убеждаемся, что корневое окно в полноэкранном режиме
     set_fullscreen(root)
     
     nav_frame, user_frame = create_navigation_bar(root, active_tab='home')
@@ -1153,7 +1155,7 @@ def home_window():
 
     ctk.CTkLabel(center_container, text="", height=100, fg_color=SAMURAI_BG).pack()
 
-
+# ========== ОКНА С ЦИТАТАМИ ==========
 
 def motivation_window():
     show_quote_window('motivation', 'Мотивационные цитаты', Motivation, active_tab='motivation')
@@ -1171,7 +1173,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
     for widget in root.winfo_children():
         widget.destroy()
     
-    
+    # Убеждаемся, что корневое окно в полноэкранном режиме
     set_fullscreen(root)
     
     nav_frame, user_frame = create_navigation_bar(root, active_tab=active_tab)
@@ -1384,7 +1386,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
         logger.error(f"Ошибка: {str(e)}")
         create_samurai_label(content_frame, "Ошибка загрузки свитков", text_color=SAMURAI_RED).pack()
 
-
+# ========== НОВОЕ ОКНО КАТЕГОРИЙ С ПОЛНЫМ УПРАВЛЕНИЕМ ==========
 
 def add_manual_quote_to_category(category, refresh_callback):
     """Ручное добавление цитаты в категорию"""
@@ -1399,7 +1401,7 @@ def add_manual_quote_to_category(category, refresh_callback):
     add_win.transient(root)
     add_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(add_win)
     
     main_frame = create_samurai_frame(add_win, fg_color=SAMURAI_BG)
@@ -1408,7 +1410,7 @@ def add_manual_quote_to_category(category, refresh_callback):
     create_samurai_label(main_frame, f"Добавить цитату в категорию: {category.name}", 
                         font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(pady=10)
     
-    
+    # Тип цитаты
     create_samurai_label(main_frame, "Тип цитаты:", text_color=SAMURAI_TEXT).pack(anchor='w', pady=(10, 5))
     quote_type_var = ctk.StringVar(value="motivation")
     
@@ -1432,17 +1434,17 @@ def add_manual_quote_to_category(category, refresh_callback):
         )
         rb.pack(side='left', padx=10)
     
-    
+    # Текст цитаты
     create_samurai_label(main_frame, "Текст цитаты:", text_color=SAMURAI_TEXT).pack(anchor='w', pady=(10, 5))
     text_entry = create_samurai_textbox(main_frame, height=150)
     text_entry.pack(fill='x', pady=5)
     
-    
+    # Автор
     create_samurai_label(main_frame, "Автор:", text_color=SAMURAI_TEXT).pack(anchor='w', pady=(10, 5))
     author_entry = create_samurai_entry(main_frame, width=400)
     author_entry.pack(fill='x', pady=5)
     
-    
+    # Опция: добавить также в общую таблицу цитат
     add_to_main_var = ctk.BooleanVar(value=True)
     add_to_main_check = ctk.CTkCheckBox(
         main_frame,
@@ -1471,7 +1473,7 @@ def add_manual_quote_to_category(category, refresh_callback):
                 author = "Неизвестный"
         
         try:
-            
+            # Проверяем, нет ли уже такой цитаты в категории
             existing = CategoryQuote.select().where(
                 (CategoryQuote.category == category.id) &
                 (CategoryQuote.quote_text == quote_text)
@@ -1481,7 +1483,7 @@ def add_manual_quote_to_category(category, refresh_callback):
                 messagebox.showerror("Ошибка", "Такая цитата уже есть в этой категории")
                 return
             
-            
+            # Если нужно добавить в общую таблицу
             if add_to_main:
                 models = {
                     'motivation': Motivation,
@@ -1490,20 +1492,20 @@ def add_manual_quote_to_category(category, refresh_callback):
                 }
                 model = models[quote_type]
                 
-                
+                # Проверяем, нет ли уже такой цитаты в общей таблице
                 try:
                     existing_main = model.get(model.text == quote_text)
-                    
+                    # Цитата уже существует в общей таблице, используем её
                     logger.info(f"Цитата уже существует в общей таблице, ID: {existing_main.id}")
                 except model.DoesNotExist:
-                    
+                    # Создаем новую цитату в общей таблице
                     model.create(
                         text=quote_text,
                         author=author
                     )
                     logger.info(f"Создана новая цитата в общей таблице")
             
-            
+            # Создаем запись в категории
             CategoryQuote.create(
                 category=category.id,
                 quote_type=quote_type,
@@ -1511,10 +1513,10 @@ def add_manual_quote_to_category(category, refresh_callback):
                 quote_author=author
             )
             
-            
+            # Обновляем файл parser.py
             update_parser_file()
             
-            
+            # Логируем действие
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='add_manual_quote_to_category',
@@ -1525,7 +1527,7 @@ def add_manual_quote_to_category(category, refresh_callback):
             messagebox.showinfo("Успех", "Цитата добавлена в категорию" + 
                               (" и в общую таблицу" if add_to_main else ""))
             add_win.destroy()
-            refresh_callback()  
+            refresh_callback()  # Обновляем окно управления цитатами
             
         except Exception as e:
             logger.error(f"Ошибка ручного добавления цитаты: {e}")
@@ -1559,7 +1561,7 @@ def hard_delete_category(category, refresh_callback):
         messagebox.showerror("Ошибка", "Только главный Сёгун может полностью удалять категории")
         return
     
-    
+    # Проверяем, есть ли цитаты в категории
     quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
     
     if messagebox.askyesno("Подтверждение", 
@@ -1568,15 +1570,15 @@ def hard_delete_category(category, refresh_callback):
                           f"Цитат в категории: {quotes_count}\n\n"
                           f"Это действие НЕЛЬЗЯ ОТМЕНИТЬ! Все связи с цитатами будут удалены."):
         try:
-            
+            # Удаляем все связи с цитатами
             deleted_quotes = CategoryQuote.delete().where(CategoryQuote.category == category.id).execute()
             
-            
+            # Полностью удаляем категорию
             category_id = category.id
             category_name = category.name
-            category.delete_instance()  
+            category.delete_instance()  # Полное удаление из БД
             
-            
+            # Логируем действие
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='hard_delete_category',
@@ -1587,7 +1589,7 @@ def hard_delete_category(category, refresh_callback):
             messagebox.showinfo("Успех", 
                               f"Категория '{category_name}' полностью удалена из БД\n"
                               f"Удалено цитат из категории: {deleted_quotes}")
-            refresh_callback()  
+            refresh_callback()  # Обновляем список категорий
             
         except Exception as e:
             logger.error(f"Ошибка полного удаления категории: {e}")
@@ -1629,7 +1631,7 @@ def categories_main_window():
     for widget in root.winfo_children():
         widget.destroy()
     
-    
+    # Убеждаемся, что корневое окно в полноэкранном режиме
     set_fullscreen(root)
     
     nav_frame, user_frame = create_navigation_bar(root, active_tab='categories')
@@ -1638,7 +1640,7 @@ def categories_main_window():
     separator = ctk.CTkFrame(root, height=2, fg_color=SAMURAI_GOLD, corner_radius=0)
     separator.pack(fill='x', side='top', pady=(0, 10))
     
-    
+    # Основной контейнер с прокруткой
     main_container = ctk.CTkScrollableFrame(
         root, 
         fg_color=SAMURAI_BG,
@@ -1647,14 +1649,14 @@ def categories_main_window():
     )
     main_container.pack(fill='both', expand=True, padx=20, pady=20)
     
-    
+    # Заголовок и кнопки
     header_frame = create_samurai_frame(main_container, fg_color=SAMURAI_BG)
     header_frame.pack(fill='x', pady=(0, 20))
     
     create_samurai_label(header_frame, "Категории мудрости", 
                         font=FONT_TITLE, text_color=SAMURAI_GOLD).pack(side='left')
     
-    
+    # Кнопка добавления категории (для админов)
     if current_user['role'] == 'администратор':
         add_btn = create_samurai_button(
             header_frame,
@@ -1666,7 +1668,7 @@ def categories_main_window():
         )
         add_btn.pack(side='right', padx=10)
     
-    
+    # Контейнер для списка категорий
     categories_container = create_samurai_frame(main_container, fg_color=SAMURAI_BG)
     categories_container.pack(fill='both', expand=True)
     
@@ -1676,7 +1678,7 @@ def categories_main_window():
             widget.destroy()
         
         try:
-            
+            # Админы видят все категории, пользователи - только активные
             if current_user['role'] == 'администратор':
                 categories = Category.select().order_by(Category.name)
             else:
@@ -1694,19 +1696,19 @@ def categories_main_window():
                 return
             
             for category in categories:
-                
+                # Карточка категории
                 cat_card = create_samurai_frame(categories_container, border_color=SAMURAI_GOLD)
                 cat_card.pack(fill='x', pady=10)
                 
-                
+                # Заголовок категории с кнопками управления
                 header_frame = create_samurai_frame(cat_card, fg_color=SAMURAI_PANEL)
                 header_frame.pack(fill='x', padx=10, pady=10)
                 
-                
+                # Информация о категории
                 info_frame = create_samurai_frame(header_frame, fg_color="transparent")
                 info_frame.pack(side='left', fill='x', expand=True)
                 
-                
+                # Статус категории (для админов)
                 status_text = ""
                 if category.is_deleted:
                     status_text = " [СКРЫТА]"
@@ -1726,7 +1728,7 @@ def categories_main_window():
                         text_color=SAMURAI_TEXT_SECONDARY
                     ).pack(anchor='w')
                 
-                
+                # Количество цитат
                 quotes_count = CategoryQuote.select().where(
                     CategoryQuote.category == category.id
                 ).count()
@@ -1738,12 +1740,12 @@ def categories_main_window():
                     text_color=SAMURAI_TEXT
                 ).pack(anchor='w', pady=(5, 0))
                 
-                
+                # Кнопки управления (только для админов)
                 if current_user['role'] == 'администратор':
                     btn_frame = create_samurai_frame(header_frame, fg_color="transparent")
                     btn_frame.pack(side='right', padx=5)
                     
-                    
+                    # Кнопка редактирования категории (недоступна для скрытых)
                     edit_btn = create_samurai_button(
                         btn_frame,
                         "✏️",
@@ -1758,9 +1760,9 @@ def categories_main_window():
                         edit_btn.bind("<Enter>", lambda e: show_tooltip(e, "Нельзя редактировать скрытую категорию"))
                         edit_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                     
-                    
+                    # Кнопка мягкого удаления/восстановления
                     if not category.is_deleted:
-                        
+                        # Кнопка скрытия (мягкое удаление)
                         hide_btn = create_samurai_button(
                             btn_frame,
                             "👻",
@@ -1773,13 +1775,13 @@ def categories_main_window():
                         )
                         hide_btn.pack(side='left', padx=2)
                         
-                        
+                        # Если есть цитаты, делаем кнопку неактивной
                         if quotes_count > 0:
                             hide_btn.configure(state="disabled")
                             hide_btn.bind("<Enter>", lambda e: show_tooltip(e, "Сначала удалите все цитаты из категории"))
                             hide_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                     else:
-                        
+                        # Кнопка восстановления (для скрытых категорий)
                         restore_btn = create_samurai_button(
                             btn_frame,
                             "🔄",
@@ -1794,7 +1796,7 @@ def categories_main_window():
                         restore_btn.bind("<Enter>", lambda e: show_tooltip(e, "Восстановить категорию"))
                         restore_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                     
-                    
+                    # Кнопка полного удаления (только для главного админа и скрытых категорий)
                     if is_main_admin() and category.is_deleted:
                         hard_delete_btn = create_samurai_button(
                             btn_frame,
@@ -1810,11 +1812,11 @@ def categories_main_window():
                         hard_delete_btn.bind("<Enter>", lambda e: show_tooltip(e, "ПОЛНОСТЬЮ УДАЛИТЬ ИЗ БД"))
                         hard_delete_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                 
-                
+                # Кнопка управления цитатами в категории
                 manage_frame = create_samurai_frame(cat_card, fg_color=SAMURAI_BG)
                 manage_frame.pack(fill='x', padx=10, pady=(0, 10))
                 
-                
+                # Кнопка просмотра цитат (для всех)
                 view_btn = create_samurai_button(
                     manage_frame,
                     "📖 Просмотреть цитаты",
@@ -1824,7 +1826,7 @@ def categories_main_window():
                 )
                 view_btn.pack(side='left', padx=5)
                 
-                
+                # Кнопка управления цитатами (только для админов и активных категорий)
                 if current_user['role'] == 'администратор' and not category.is_deleted:
                     manage_quotes_btn = create_samurai_button(
                         manage_frame,
@@ -1844,7 +1846,7 @@ def categories_main_window():
                 text_color=SAMURAI_RED
             ).pack(pady=50)
     
-    
+    # Загружаем категории
     load_categories()
 
 
@@ -1862,7 +1864,7 @@ def add_category_window(refresh_callback):
     add_win.transient(root)
     add_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(add_win)
     
     main_frame = create_samurai_frame(add_win, fg_color=SAMURAI_BG)
@@ -1905,7 +1907,7 @@ def add_category_window(refresh_callback):
             
             messagebox.showinfo("Успех", f"Категория '{name}' создана")
             add_win.destroy()
-            refresh_callback()  
+            refresh_callback()  # Обновляем список категорий
             
         except Exception as e:
             if "Duplicate entry" in str(e):
@@ -1952,7 +1954,7 @@ def edit_category_window(category, refresh_callback):
     edit_win.transient(root)
     edit_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(edit_win)
     
     main_frame = create_samurai_frame(edit_win, fg_color=SAMURAI_BG)
@@ -2036,7 +2038,7 @@ def delete_category(category, refresh_callback):
         messagebox.showerror("Ошибка", "Только Сёгун может удалять категории")
         return
     
-    
+    # Проверяем, есть ли цитаты в категории
     quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
     if quotes_count > 0:
         messagebox.showerror("Ошибка", 
@@ -2049,11 +2051,11 @@ def delete_category(category, refresh_callback):
                           f"Категория будет помечена как удаленная, но останется в БД.\n"
                           f"Полное удаление доступно только главному Сёгуну."):
         try:
-            
+            # Мягкое удаление (помечаем как удаленную)
             category.is_deleted = True
             category.save()
             
-            
+            # Логируем действие
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='soft_delete_category',
@@ -2062,7 +2064,7 @@ def delete_category(category, refresh_callback):
             )
             
             messagebox.showinfo("Успех", f"Категория '{category.name}' скрыта")
-            refresh_callback()  
+            refresh_callback()  # Обновляем список категорий
             
         except Exception as e:
             logger.error(f"Ошибка скрытия категории: {e}")
@@ -2081,7 +2083,7 @@ def show_category_quotes_window(category):
     cat_win.transient(root)
     cat_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(cat_win)
     
     main_frame = create_samurai_frame(cat_win, fg_color=SAMURAI_BG)
@@ -2094,15 +2096,15 @@ def show_category_quotes_window(category):
         create_samurai_label(main_frame, category.description, 
                            text_color=SAMURAI_TEXT_SECONDARY).pack(pady=5)
     
-    
+    # Таблица с цитатами
     table_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_BG)
     table_frame.pack(fill='both', expand=True, pady=20)
     
-    
+    # Создаем Treeview с прокруткой
     tree_frame = create_samurai_frame(table_frame, fg_color=SAMURAI_BG)
     tree_frame.pack(fill='both', expand=True)
     
-    
+    # Создаем стиль для Treeview
     style = ttk.Style()
     style.configure("Category.Treeview", 
                     background=SAMURAI_CARD,
@@ -2133,7 +2135,7 @@ def show_category_quotes_window(category):
     
     setup_touchpad_scrolling(tree)
     
-    
+    # Загружаем цитаты
     try:
         relations = CategoryQuote.select().where(
             CategoryQuote.category == category.id
@@ -2146,7 +2148,7 @@ def show_category_quotes_window(category):
         }
         
         for rel in relations:
-            
+            # Сокращаем длинный текст для отображения
             display_text = rel.quote_text
             if len(display_text) > 100:
                 display_text = display_text[:100] + "..."
@@ -2172,7 +2174,7 @@ def show_category_quotes_window(category):
             text_color=SAMURAI_RED
         ).pack(pady=50)
     
-    
+    # Кнопка закрытия
     create_samurai_button(main_frame, "Закрыть", cat_win.destroy).pack(pady=10)
 
 
@@ -2189,13 +2191,13 @@ def manage_category_quotes_window(category, refresh_callback):
     manage_win.transient(root)
     manage_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(manage_win)
     
     main_frame = create_samurai_frame(manage_win, fg_color=SAMURAI_BG)
     main_frame.pack(fill='both', expand=True, padx=20, pady=20)
     
-    
+    # Заголовок
     header_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_PANEL)
     header_frame.pack(fill='x', pady=10)
     
@@ -2213,7 +2215,7 @@ def manage_category_quotes_window(category, refresh_callback):
             text_color=SAMURAI_TEXT_SECONDARY
         ).pack(pady=(0, 10))
     
-    
+    # Кнопка ручного добавления
     manual_btn_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_BG)
     manual_btn_frame.pack(fill='x', pady=10)
     
@@ -2226,7 +2228,7 @@ def manage_category_quotes_window(category, refresh_callback):
         width=200
     ).pack(side='left', padx=5)
     
-    
+    # Вкладки для разных типов цитат
     tabview = ctk.CTkTabview(
         main_frame,
         fg_color=SAMURAI_PANEL,
@@ -2239,19 +2241,19 @@ def manage_category_quotes_window(category, refresh_callback):
     tabview.add("Цитаты в категории")
     tabview.add("Добавить из существующих")
     
-    
+    # Вкладка "Цитаты в категории"
     quotes_in_cat_tab = tabview.tab("Цитаты в категории")
     
     def load_category_quotes_tab_content(parent_tab, cat, refresh):
-        
+        # Очищаем вкладку
         for widget in parent_tab.winfo_children():
             widget.destroy()
         
-        
+        # Поиск и сортировка
         controls_frame = create_samurai_frame(parent_tab, fg_color=SAMURAI_BG)
         controls_frame.pack(fill='x', pady=10)
         
-        
+        # Поиск
         search_frame = create_samurai_frame(controls_frame, fg_color="transparent")
         search_frame.pack(fill='x', pady=5)
         
@@ -2269,7 +2271,7 @@ def manage_category_quotes_window(category, refresh_callback):
             width=80
         ).pack(side='left', padx=5)
         
-        
+        # Сортировка
         sort_frame = create_samurai_frame(controls_frame, fg_color="transparent")
         sort_frame.pack(fill='x', pady=5)
         
@@ -2310,13 +2312,13 @@ def manage_category_quotes_window(category, refresh_callback):
             text_color=SAMURAI_TEXT
         ).pack(side='left', padx=10)
         
-        
+        # Фильтр по автору
         filter_frame = create_samurai_frame(controls_frame, fg_color="transparent")
         filter_frame.pack(fill='x', pady=5)
         
         create_samurai_label(filter_frame, "Фильтр по автору:", text_color=SAMURAI_TEXT).pack(side='left', padx=5)
         
-        
+        # Получаем уникальных авторов из категории
         authors = CategoryQuote.select(CategoryQuote.quote_author).where(
             CategoryQuote.category == cat.id
         ).distinct()
@@ -2340,7 +2342,7 @@ def manage_category_quotes_window(category, refresh_callback):
         )
         author_combo.pack(side='left', padx=5)
         
-        
+        # Кнопка сброса
         create_samurai_button(
             filter_frame,
             "🔄 Сбросить",
@@ -2351,7 +2353,7 @@ def manage_category_quotes_window(category, refresh_callback):
             width=80
         ).pack(side='left', padx=5)
         
-        
+        # Кнопка удаления всех цитат
         create_samurai_button(
             controls_frame,
             "🗑️ Удалить все цитаты",
@@ -2361,11 +2363,11 @@ def manage_category_quotes_window(category, refresh_callback):
             width=150
         ).pack(side='right', padx=5)
         
-        
+        # Таблица с цитатами
         table_frame = create_samurai_frame(parent_tab, fg_color=SAMURAI_BG)
         table_frame.pack(fill='both', expand=True)
         
-        
+        # Создаем Treeview с возможностью изменения размеров колонок
         tree_frame = create_samurai_frame(table_frame, fg_color=SAMURAI_BG)
         tree_frame.pack(fill='both', expand=True)
         
@@ -2380,7 +2382,7 @@ def manage_category_quotes_window(category, refresh_callback):
         tree.column("text", width=700, anchor="w", stretch=True)
         tree.column("author", width=200, anchor="w", stretch=True)
         
-        
+        # Разрешаем изменение размеров колонок
         for col in columns:
             tree.column(col, stretch=True)
         
@@ -2392,7 +2394,7 @@ def manage_category_quotes_window(category, refresh_callback):
         
         setup_touchpad_scrolling(tree)
         
-        
+        # Контекстное меню
         context_menu = Menu(root, tearoff=0, bg=SAMURAI_PANEL, fg="white")
         context_menu.add_command(label="🗑️ Удалить из категории", 
                                 command=lambda: remove_from_category(tree, cat, refresh))
@@ -2414,20 +2416,20 @@ def manage_category_quotes_window(category, refresh_callback):
                 tree.delete(item)
             
             try:
-                
+                # Базовый запрос
                 query = CategoryQuote.select().where(
                     CategoryQuote.category == cat.id
                 )
                 
-                
+                # Фильтр по поиску
                 if search_text:
                     query = query.where(CategoryQuote.quote_text.contains(search_text))
                 
-                
+                # Фильтр по автору
                 if author_var.get() != "Все":
                     query = query.where(CategoryQuote.quote_author == author_var.get())
                 
-                
+                # Сортировка
                 if sort_order == "asc":
                     query = query.order_by(CategoryQuote.quote_text.asc())
                 elif sort_order == "desc":
@@ -2440,7 +2442,7 @@ def manage_category_quotes_window(category, refresh_callback):
                 }
                 
                 for rel in query:
-                    
+                    # Сокращаем длинный текст для отображения
                     display_text = rel.quote_text
                     if len(display_text) > 80:
                         display_text = display_text[:80] + "..."
@@ -2454,16 +2456,16 @@ def manage_category_quotes_window(category, refresh_callback):
             except Exception as e:
                 logger.error(f"Ошибка загрузки цитат категории: {e}")
         
-        
+        # Привязываем Enter для поиска
         search_entry.bind("<Return>", lambda e: search_quotes())
         
-        
+        # Загружаем начальный список
         load_quotes()
     
-    
+    # Загружаем содержимое вкладки
     load_category_quotes_tab_content(quotes_in_cat_tab, category, refresh_callback)
     
-    
+    # Вкладка "Добавить из существующих"
     add_quotes_tab = tabview.tab("Добавить из существующих")
     load_add_quotes_tab(add_quotes_tab, category, refresh_callback)
 
@@ -2471,17 +2473,17 @@ def manage_category_quotes_window(category, refresh_callback):
 def load_add_quotes_tab(parent, category, refresh_callback):
     """Загрузка вкладки добавления цитат из существующих"""
     
-    
+    # ВНУТРЕННЯЯ ФУНКЦИЯ - определяем сначала
     def get_model_by_type(type_str):
         """Получение модели по типу"""
         if type_str == "Мотивация":
             return Motivation
         elif type_str == "Аффирмации":
             return Affirmation
-        else:  
+        else:  # Юмор
             return FunnyQuote
     
-    
+    # Фильтр по типу
     filter_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     filter_frame.pack(fill='x', pady=10)
     
@@ -2505,7 +2507,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     )
     type_combobox.pack(side='left', padx=5)
     
-
+    # Поиск
     search_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     search_frame.pack(fill='x', pady=10)
     
@@ -2533,7 +2535,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         width=100
     ).pack(side='left', padx=5)
     
-    
+    # Таблица с цитатами
     table_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     table_frame.pack(fill='both', expand=True, pady=10)
     
@@ -2558,7 +2560,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     
     setup_touchpad_scrolling(tree)
     
-    
+    # Функция для добавления одной цитаты
     def add_single_quote_to_category(item_id):
         """Добавление одной цитаты в категорию"""
         item = tree.item(item_id)
@@ -2571,10 +2573,10 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             if type_key == "аффирмации":
                 type_key = "affirmation"
             
-            
+            # Получаем полные данные цитаты из БД
             quote = model.get_by_id(quote_id)
             
-            
+            # Проверяем, не добавлена ли уже такая цитата (по тексту)
             try:
                 CategoryQuote.get(
                     (CategoryQuote.category == category.id) &
@@ -2585,7 +2587,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             except CategoryQuote.DoesNotExist:
                 pass
             
-            
+            # Создаем запись с полным текстом цитаты
             CategoryQuote.create(
                 category=category.id,
                 quote_type=type_key,
@@ -2593,7 +2595,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
                 quote_author=quote.author if quote.author else "Неизвестный"
             )
             
-            
+            # Логируем действие
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='add_quote_to_category',
@@ -2603,15 +2605,15 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             
             messagebox.showinfo("Успех", "Цитата добавлена в категорию")
             
-            
+            # Удаляем добавленную цитату из списка
             tree.delete(item_id)
-            refresh_callback()  
+            refresh_callback()  # Обновляем основное окно категорий
             
         except Exception as e:
             logger.error(f"Ошибка добавления цитаты: {e}")
             messagebox.showerror("Ошибка", f"Не удалось добавить цитату: {str(e)}")
     
-    
+    # Обработчик двойного клика
     def on_double_click(event):
         """Обработка двойного клика по цитате"""
         selection = tree.selection()
@@ -2621,15 +2623,15 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         item_id = selection[0]
         values = tree.item(item_id, "values")
         
-        
+        # Проверяем, что это не сообщение об ошибке или пустом списке
         if values and len(values) > 1 and values[1] not in ["Нет доступных цитат для добавления", "Ошибка загрузки:"]:
-            
+            # Спрашиваем подтверждение
             if messagebox.askyesno("Подтверждение", "Добавить эту цитату в категорию?"):
                 add_single_quote_to_category(item_id)
     
     tree.bind("<Double-1>", on_double_click)
     
-    
+    # Кнопка добавления выбранных
     btn_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     btn_frame.pack(fill='x', pady=10)
     
@@ -2642,7 +2644,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         width=250
     ).pack()
     
-    
+    # Подсказка
     hint_label = create_samurai_label(
         btn_frame,
         "💡 Подсказка: дважды кликните по цитате для быстрого добавления",
@@ -2662,13 +2664,13 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             if type_key == "аффирмации":
                 type_key = "affirmation"
             
-            
+            # Получаем уже добавленные цитаты (по тексту, а не по ID)
             added_quotes = CategoryQuote.select().where(
                 CategoryQuote.category == category.id
             )
             added_texts = [q.quote_text for q in added_quotes]
             
-            
+            # Получаем все цитаты, кроме добавленных
             query = model.select().where(model.is_deleted == False)
             
             if search_text:
@@ -2688,7 +2690,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
                         status
                     ))
             
-            
+            # Если ничего не загрузилось, показываем сообщение
             if not tree.get_children():
                 tree.insert("", "end", values=(
                     "",
@@ -2706,14 +2708,14 @@ def load_add_quotes_tab(parent, category, refresh_callback):
                 ""
             ))
     
-    
+    # Привязка событий
     def on_type_change(*args):
         load_quotes_list()
     
     quote_type_var.trace_add("write", on_type_change)
     search_entry.bind("<Return>", lambda e: search_quotes())
     
-    
+    # Загружаем начальный список
     load_quotes_list()
 
 
@@ -2724,7 +2726,7 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
         messagebox.showwarning("Выбор", "Выберите цитаты для добавления")
         return
     
-    
+    # ВНУТРЕННЯЯ ФУНКЦИЯ - определяем сначала
     def get_model_by_type(type_str):
         if type_str == "Мотивация":
             return Motivation
@@ -2747,20 +2749,20 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             continue
         
         try:
-            
+            # Получаем полные данные цитаты из БД
             quote = model.get_by_id(quote_id)
             
-            
+            # Проверяем, не добавлена ли уже такая цитата (по тексту)
             try:
                 CategoryQuote.get(
                     (CategoryQuote.category == category.id) &
                     (CategoryQuote.quote_text == quote.text)
                 )
-                continue  
+                continue  # Уже есть
             except CategoryQuote.DoesNotExist:
                 pass
             
-            
+            # Создаем запись с полным текстом цитаты (без added_by и added_at)
             CategoryQuote.create(
                 category=category.id,
                 quote_type=type_key,
@@ -2782,14 +2784,14 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
         
         messagebox.showinfo("Успех", f"Добавлено {added_count} цитат в категорию")
         
-
+        # Удаляем добавленные из списка
         for item in selection:
             try:
                 tree.delete(item)
             except:
                 pass
         
-        refresh_callback()  
+        refresh_callback()  # Обновляем основное окно категорий
     else:
         messagebox.showinfo("Информация", "Ни одна из выбранных цитат не была добавлена")
 
@@ -2800,7 +2802,7 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
         messagebox.showerror("Ошибка", "Только Сёгун может удалять цитаты из категорий")
         return
     
-    
+    # Подсчитываем количество цитат
     quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
     
     if quotes_count == 0:
@@ -2812,10 +2814,10 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
                           f"Количество цитат: {quotes_count}\n\n"
                           f"Это действие нельзя отменить."):
         try:
-            
+            # Удаляем все цитаты из категории
             deleted = CategoryQuote.delete().where(CategoryQuote.category == category.id).execute()
             
-            
+            # Логируем действие
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='remove_all_quotes_from_category',
@@ -2824,8 +2826,8 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
             )
             
             messagebox.showinfo("Успех", f"Удалено {deleted} цитат из категории")
-            load_quotes_callback() 
-            refresh_callback()  
+            load_quotes_callback()  # Обновляем список цитат
+            refresh_callback()  # Обновляем основное окно категорий
             
         except Exception as e:
             logger.error(f"Ошибка удаления всех цитат из категории: {e}")
@@ -2865,14 +2867,14 @@ def remove_from_category(tree, category, refresh_callback):
             
             messagebox.showinfo("Успех", "Цитата убрана из категории")
             tree.delete(item)
-            refresh_callback()  
+            refresh_callback()  # Обновляем основное окно категорий
             
         except Exception as e:
             logger.error(f"Ошибка удаления из категории: {e}")
             messagebox.showerror("Ошибка", f"Не удалось удалить цитату: {str(e)}")
 
 
-
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ПОДСКАЗОК ==========
 
 def show_tooltip(event, text):
     """Показать всплывающую подсказку"""
@@ -2886,7 +2888,7 @@ def show_tooltip(event, text):
                         relief='solid', borderwidth=1, font=("Segoe UI", 9))
         label.pack()
         
-        
+        # Сохраняем ссылку на tooltip
         event.widget.tooltip = tooltip
     except:
         pass
@@ -2901,7 +2903,7 @@ def hide_tooltip(event):
         delattr(event.widget, 'tooltip')
 
 
-
+# ========== ОКНО РАЗРАБОТЧИКА (ПАНЕЛЬ СЁГУНА) ==========
 
 def developer_window():
     if not check_auth():
@@ -2914,7 +2916,7 @@ def developer_window():
     dev_win.transient(root)
     dev_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(dev_win)
     
     main_frame = create_samurai_frame(dev_win, fg_color=SAMURAI_BG)
@@ -2922,12 +2924,12 @@ def developer_window():
     
     create_samurai_label(main_frame, "Панель Сёгуна", font=FONT_TITLE, text_color=SAMURAI_GOLD).pack(pady=10)
     
-    
+    # Кнопки управления (только для главного админа)
     if is_main_admin():
         content_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_PANEL)
         content_frame.pack(fill='x', padx=20, pady=10)
         
-        
+        # Ряд кнопок управления
         button_row = create_samurai_frame(content_frame, fg_color="transparent")
         button_row.pack(pady=10)
         
@@ -2938,7 +2940,7 @@ def developer_window():
             width=200
         ).pack(side='left', padx=5)
     
-    
+    # Вкладки
     tabview = ctk.CTkTabview(
         main_frame,
         fg_color=SAMURAI_PANEL,
@@ -3091,7 +3093,7 @@ def manage_quotes_window():
     manage_win.transient(root)
     manage_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(manage_win)
     
     main_frame = create_samurai_frame(manage_win, fg_color=SAMURAI_BG)
@@ -3200,7 +3202,7 @@ def add_quote_window(quote_type):
     add_win.transient(root)
     add_win.grab_set()
     
-    
+    # Устанавливаем полноэкранный режим
     set_fullscreen(add_win)
     
     main_frame = create_samurai_frame(add_win, fg_color=SAMURAI_BG)
@@ -3294,7 +3296,7 @@ def edit_selected_quote(tree, quote_type):
         edit_win.transient(root)
         edit_win.grab_set()
         
-        
+        # Устанавливаем полноэкранный режим
         set_fullscreen(edit_win)
         
         main_frame = create_samurai_frame(edit_win, fg_color=SAMURAI_BG)
@@ -3383,7 +3385,7 @@ def delete_selected_quote(tree, quote_type):
         del_win.transient(root)
         del_win.grab_set()
         
-        
+        # Устанавливаем полноэкранный режим
         set_fullscreen(del_win)
         
         main_frame = create_samurai_frame(del_win, fg_color=SAMURAI_BG)
@@ -3496,7 +3498,7 @@ def logout():
     show_auth_window()
 
 
-
+# ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
 
 if __name__ == "__main__":
     init_db()

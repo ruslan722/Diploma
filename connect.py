@@ -1,5 +1,5 @@
 from peewee import (
-    Model, MySQLDatabase, CharField, DateTimeField, BooleanField, TextField, IntegerField
+    Model, MySQLDatabase, CharField, DateTimeField, BooleanField, TextField, IntegerField, ForeignKeyField
 )
 import datetime
 import logging
@@ -10,7 +10,7 @@ db = MySQLDatabase(
     user='root',
     password='root',
     host='localhost',
-    port=3306
+    port=3307
 )
 
 class BaseModel(Model):
@@ -68,10 +68,38 @@ class UserProfile(BaseModel):
 
 class AdminActionLog(BaseModel):
     admin_username = CharField()
-    action_type = CharField()  # 'add_quote', 'edit_quote', 'delete_quote', etc.
+    action_type = CharField()  # 'add_quote', 'edit_quote', 'delete_quote', 'add_category', 'edit_category', 'soft_delete_category', 'hard_delete_category', 'restore_category', 'add_quote_to_category', 'remove_quote_from_category', 'remove_all_quotes_from_category', 'add_manual_quote_to_category', etc.
     target_username = CharField()
     details = TextField()
     created_at = DateTimeField(default=datetime.datetime.now)
+
+
+# --- ТАБЛИЦЫ ДЛЯ КАТЕГОРИЙ ---
+
+class Category(BaseModel):
+    """Категория для группировки цитат"""
+    name = CharField(unique=True, max_length=100)
+    description = TextField(null=True)
+    created_at = DateTimeField(default=datetime.datetime.now)
+    is_deleted = BooleanField(default=False)  # Мягкое удаление
+    
+    class Meta:
+        table_name = 'categories'
+
+class CategoryQuote(BaseModel):
+    """Связь цитаты с категорией"""
+    category = ForeignKeyField(Category, backref='quotes', on_delete='CASCADE')
+    quote_type = CharField(max_length=20)  # 'motivation', 'affirmation', 'funny'
+    quote_text = CharField()  # Текст цитаты
+    quote_author = CharField(max_length=200)  # Автор цитаты
+    added_at = DateTimeField(default=datetime.datetime.now)  # Дата добавления
+    
+    class Meta:
+        table_name = 'category_quotes'
+        indexes = (
+            # Уникальный индекс, чтобы одна цитата не могла быть дважды в одной категории
+            (('category', 'quote_text'), True),
+        )
 
 
 # Инициализация и миграция (добавление колонок, если их нет)
@@ -80,7 +108,8 @@ def init_db():
     # Создаем таблицы
     db.create_tables([
         Motivation, Affirmation, FunnyQuote, Avtorization,
-        AdminRequests, UserReaction, UserProfile, AdminActionLog
+        AdminRequests, UserReaction, UserProfile, AdminActionLog,
+        Category, CategoryQuote  # Добавлены новые таблицы
     ], safe=True)
     
     # Простая миграция для добавления колонок в существующие таблицы
@@ -97,6 +126,16 @@ def init_db():
         except: pass
         try:
             migrate(migrator.add_column('funnyquote', 'is_deleted', BooleanField(default=False)))
+        except: pass
+        
+        # Добавляем is_deleted в таблицу категорий, если его нет
+        try:
+            migrate(migrator.add_column('categories', 'is_deleted', BooleanField(default=False)))
+        except: pass
+        
+        # Добавляем added_at в таблицу category_quotes, если его нет
+        try:
+            migrate(migrator.add_column('category_quotes', 'added_at', DateTimeField(default=datetime.datetime.now)))
         except: pass
             
     except Exception as e:
