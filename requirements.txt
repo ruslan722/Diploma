@@ -6,3 +6,5 @@ pillow
 requests
 beautifulsoup4
 customtkinter
+Fastapi
+uvicorn

@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox, Menu, ttk, scrolledtext, filedialog
-from PIL import Image, ImageTk
+from tkinter import messagebox, Menu, ttk, filedialog
+from PIL import Image
 import webbrowser
 import hashlib
 import secrets
@@ -12,7 +12,6 @@ import random
 import string
 from datetime import datetime
 
-
 from connect import (
     Avtorization, Motivation, Affirmation, FunnyQuote,
     AdminRequests, UserReaction, UserProfile, AdminActionLog, init_db,
@@ -21,24 +20,19 @@ from connect import (
 
 
 def set_fullscreen(window):
-    """Устанавливает полноэкранный режим для окна"""
     try:
-    
         if os.name == 'nt':
             window.state('zoomed')
-        
         else:
             window.attributes('-fullscreen', True)
     except Exception as e:
         logging.error(f"Ошибка установки полноэкранного режима: {e}")
-        
         try:
             window.state('zoomed')
         except:
             pass
 
 def toggle_fullscreen(event=None):
-    """Переключение полноэкранного режима по Escape"""
     try:
         if os.name == 'nt':
             if root.state() == 'zoomed':
@@ -58,17 +52,17 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 
-SAMURAI_BG = "#0d0d0d"           
-SAMURAI_PANEL = "#1a1a1a"        
-SAMURAI_CARD = "#262626"         
-SAMURAI_RED = "#8B0000"          
-SAMURAI_RED_HOVER = "#5e0000"    
-SAMURAI_GOLD = "#D4AF37"         
-SAMURAI_GOLD_HOVER = "#b08d2b"   
-SAMURAI_TEXT = "#E8E8E8"         
-SAMURAI_TEXT_SECONDARY = "#A0A0A0"  
-SAMURAI_GREEN = "#2E8B57"        
-SAMURAI_GREEN_HOVER = "#3e6b3f"  
+SAMURAI_BG = "#0d0d0d"
+SAMURAI_PANEL = "#1a1a1a"
+SAMURAI_CARD = "#262626"
+SAMURAI_RED = "#8B0000"
+SAMURAI_RED_HOVER = "#5e0000"
+SAMURAI_GOLD = "#D4AF37"
+SAMURAI_GOLD_HOVER = "#b08d2b"
+SAMURAI_TEXT = "#E8E8E8"
+SAMURAI_TEXT_SECONDARY = "#A0A0A0"
+SAMURAI_GREEN = "#2E8B57"
+SAMURAI_GREEN_HOVER = "#3e6b3f"
 
 
 FONT_PRIMARY = ("Segoe UI", 12)
@@ -129,7 +123,6 @@ loading_frames = []
 loading_animation_id = None
 
 
-
 def create_samurai_button(parent, text, command=None, color=SAMURAI_RED, hover_color=SAMURAI_RED_HOVER, 
                          text_color="white", width=140, height=35, font=FONT_BOLD):
     return ctk.CTkButton(
@@ -146,7 +139,6 @@ def create_samurai_entry(parent, placeholder="", show=None, width=300):
     )
 
 def create_scrollable_textbox(parent, height=100, width=600):
-    """Создает скроллируемое текстовое поле с кастомным скроллбаром"""
     return ctk.CTkTextbox(
         parent, 
         fg_color=SAMURAI_PANEL, 
@@ -162,7 +154,6 @@ def create_scrollable_textbox(parent, height=100, width=600):
     )
 
 def create_samurai_textbox(parent, height=100, width=600, scrollable=False):
-    """Создает текстовое поле с возможностью скролла"""
     return ctk.CTkTextbox(
         parent, 
         fg_color=SAMURAI_PANEL, 
@@ -190,7 +181,6 @@ def create_samurai_progressbar(parent, width=300):
 
 
 def setup_touchpad_scrolling(widget):
-    """Включает прокрутку тачпадом для ttk виджетов"""
     def _on_mousewheel(event):
         try:
             widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
@@ -214,7 +204,6 @@ def setup_touchpad_scrolling(widget):
 
     widget.bind('<Enter>', _bind_to_mousewheel)
     widget.bind('<Leave>', _unbind_from_mousewheel)
-
 
 
 def generate_captcha_text():
@@ -246,7 +235,6 @@ def safe_widget_update(widget, method, *args, **kwargs):
             return True
     except Exception as e: logger.warning(f"Не удалось обновить виджет {widget}: {str(e)}")
     return False
-
 
 
 def hash_password(password): 
@@ -305,9 +293,7 @@ def check_auth():
     return True
 
 
-
 def get_or_create_profile(username):
-    """Получить или создать профиль пользователя"""
     try:
         profile = UserProfile.get(UserProfile.username == username)
         return profile
@@ -316,7 +302,6 @@ def get_or_create_profile(username):
         return profile
 
 def update_profile(username, nickname=None, avatar_path=None):
-    """Обновить профиль пользователя"""
     try:
         profile = get_or_create_profile(username)
         if nickname is not None:
@@ -330,7 +315,6 @@ def update_profile(username, nickname=None, avatar_path=None):
         return False, str(e)
 
 def get_display_name(username):
-    """Получить отображаемое имя """
     try:
         profile = UserProfile.get(UserProfile.username == username)
         return profile.nickname if profile.nickname else username
@@ -338,7 +322,6 @@ def get_display_name(username):
         return username
 
 def save_avatar(username, image_path):
-    """Сохранить аватарку пользователя"""
     try:
         if not os.path.exists('avatars'):
             os.makedirs('avatars')
@@ -353,7 +336,6 @@ def save_avatar(username, image_path):
     except Exception as e:
         logger.error(f"Ошибка сохранения аватарки: {e}")
         return False, str(e)
-
 
 
 def load_gif_frames():
@@ -442,9 +424,7 @@ def show_loading_screen(target_function, *args):
     play_animation()
 
 
-
 def update_nav_user_info(nav_frame):
-    """Обновляет информацию о пользователе в навигационной панели"""
     
     user_frame = None
     for widget in nav_frame.winfo_children():
@@ -517,7 +497,6 @@ def update_nav_user_info(nav_frame):
         ).pack(side='left', padx=5)
 
 def create_navigation_bar(parent, active_tab=None):
-    """Создает навигационную панель с обновленной информацией о пользователе"""
     nav_frame = create_samurai_frame(parent, fg_color="black")
     nav_frame.pack(fill='x', side='top')
     
@@ -568,7 +547,6 @@ def create_navigation_bar(parent, active_tab=None):
     user_frame.pack(side='right', padx=20, pady=10)
     
     return nav_frame, user_frame
-
 
 
 def show_auth_window():
@@ -901,9 +879,7 @@ def complete_admin_registration_window(username):
                         text_color=SAMURAI_RED, font=('Segoe UI', 9)).pack(pady=10)
 
 
-
 def show_profile_settings():
-    """Окно настроек профиля"""
     if not check_auth():
         return
 
@@ -1013,7 +989,6 @@ def show_profile_settings():
 
     create_samurai_button(buttons_frame, "Отмена", profile_win.destroy,
                          color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
-
 
 
 def home_window():
@@ -1154,7 +1129,6 @@ def home_window():
     ctk.CTkLabel(center_container, text="", height=100, fg_color=SAMURAI_BG).pack()
 
 
-
 def motivation_window():
     show_quote_window('motivation', 'Мотивационные цитаты', Motivation, active_tab='motivation')
 
@@ -1284,23 +1258,38 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
                 if reaction_type == 'dislike':
                     quotes.pop(current_quote_index)
                     if not quotes:
-                        quote_label.configure(text="Пусто")
+                        quote_label.configure(text="Все цитаты отклонены")
+                        author_label.configure(text="")
                         return
                     if current_quote_index >= len(quotes):
                         current_quote_index = 0
                     update_quote_display()
                 else:
                     update_likes_count()
-            except: pass
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при установке реакции: {e}")
 
         reaction_buttons_frame = create_samurai_frame(reaction_frame, fg_color=SAMURAI_BG)
         reaction_buttons_frame.pack(side='right')
         
-        create_samurai_button(reaction_buttons_frame, "👍 Честь", lambda: set_reaction('like'),
-                            color=SAMURAI_GREEN, hover_color=SAMURAI_GREEN_HOVER, width=100).pack(side='left', padx=5)
+        create_samurai_button(
+            reaction_buttons_frame, 
+            "👍 Честь", 
+            lambda: set_reaction('like'),
+            color=SAMURAI_GREEN, 
+            hover_color=SAMURAI_GREEN_HOVER, 
+            width=100
+        ).pack(side='left', padx=5)
         
-        create_samurai_button(reaction_buttons_frame, "👎 Бесчестие", lambda: set_reaction('dislike'),
-                            color=SAMURAI_RED, hover_color=SAMURAI_RED_HOVER, width=100).pack(side='left', padx=5)
+        create_samurai_button(
+            reaction_buttons_frame, 
+            "👎 Бесчестие", 
+            lambda: set_reaction('dislike'),
+            color=SAMURAI_RED, 
+            hover_color=SAMURAI_RED_HOVER, 
+            width=100
+        ).pack(side='left', padx=5)
         
         nav_controls_frame = create_samurai_frame(slider_frame, fg_color=SAMURAI_BG)
         nav_controls_frame.pack(pady=20)
@@ -1355,29 +1344,6 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
             width=200
         ).pack(pady=(0, 20))
         
-        def on_key_press(event):
-            try:
-                if event.keysym == 'Left': prev_quote()
-                elif event.keysym == 'Right': next_quote()
-                elif event.keysym == 'space': show_random_quote()
-            except: pass
-        
-        key_bindings = [
-            root.bind('<Left>', on_key_press),
-            root.bind('<Right>', on_key_press),
-            root.bind('<space>', on_key_press)
-        ]
-        
-        def cleanup():
-            for b in key_bindings:
-                try: 
-                    root.unbind('<Left>', b)
-                    root.unbind('<Right>', b)
-                    root.unbind('<space>', b)
-                except: pass
-        
-        content_frame.bind('<Destroy>', lambda e: cleanup())
-        
         update_quote_display()
         
     except Exception as e:
@@ -1385,9 +1351,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
         create_samurai_label(content_frame, "Ошибка загрузки свитков", text_color=SAMURAI_RED).pack()
 
 
-
 def add_manual_quote_to_category(category, refresh_callback):
-    """Ручное добавление цитаты в категорию"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может добавлять цитаты")
         return
@@ -1554,7 +1518,6 @@ def add_manual_quote_to_category(category, refresh_callback):
 
 
 def hard_delete_category(category, refresh_callback):
-    """Полное удаление категории из БД (только для главного админа)"""
     if not is_main_admin():
         messagebox.showerror("Ошибка", "Только главный Сёгун может полностью удалять категории")
         return
@@ -1594,8 +1557,45 @@ def hard_delete_category(category, refresh_callback):
             messagebox.showerror("Ошибка", f"Не удалось полностью удалить категорию: {str(e)}")
 
 
+def soft_delete_category(category, refresh_callback):
+    if current_user['role'] != 'администратор':
+        messagebox.showerror("Ошибка", "Только Сёгун может скрывать категории")
+        return
+    
+    
+    quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
+    if quotes_count > 0:
+        messagebox.showerror("Ошибка", 
+                           f"Нельзя скрыть категорию с цитатами.\n"
+                           f"Сначала удалите все цитаты из категории (сейчас: {quotes_count} цитат).")
+        return
+    
+    if messagebox.askyesno("Подтверждение", 
+                          f"Вы уверены, что хотите скрыть категорию '{category.name}'?\n\n"
+                          f"Категория будет помечена как удаленная, но останется в БД.\n"
+                          f"Полное удаление доступно только главному Сёгуну."):
+        try:
+            
+            category.is_deleted = True
+            category.save()
+            
+            
+            AdminActionLog.create(
+                admin_username=current_user['username'],
+                action_type='soft_delete_category',
+                target_username='System',
+                details=f"Скрыта категория: {category.name} (ID: {category.id})"
+            )
+            
+            messagebox.showinfo("Успех", f"Категория '{category.name}' скрыта")
+            refresh_callback()  
+            
+        except Exception as e:
+            logger.error(f"Ошибка скрытия категории: {e}")
+            messagebox.showerror("Ошибка", f"Не удалось скрыть категорию: {str(e)}")
+
+
 def restore_category(category, refresh_callback):
-    """Восстановление скрытой категории"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может восстанавливать категории")
         return
@@ -1622,7 +1622,6 @@ def restore_category(category, refresh_callback):
 
 
 def categories_main_window():
-    """Главное окно категорий с полным управлением"""
     if not check_auth():
         return
         
@@ -1659,7 +1658,7 @@ def categories_main_window():
         add_btn = create_samurai_button(
             header_frame,
             "➕ Создать категорию",
-            lambda: add_category_window(refresh_callback=load_categories),
+            lambda: add_category_window(refresh_callback=lambda: load_categories()),
             color=SAMURAI_GREEN,
             hover_color=SAMURAI_GREEN_HOVER,
             width=180
@@ -1667,20 +1666,145 @@ def categories_main_window():
         add_btn.pack(side='right', padx=10)
     
     
+    filter_frame = create_samurai_frame(main_container, fg_color=SAMURAI_PANEL)
+    filter_frame.pack(fill='x', pady=10)
+    
+    
+    search_frame = create_samurai_frame(filter_frame, fg_color="transparent")
+    search_frame.pack(fill='x', padx=10, pady=5)
+    
+    create_samurai_label(search_frame, "🔍 Поиск:", text_color=SAMURAI_TEXT).pack(side='left', padx=5)
+    search_entry = create_samurai_entry(search_frame, width=300)
+    search_entry.pack(side='left', padx=5)
+    
+    
+    sort_frame = create_samurai_frame(filter_frame, fg_color="transparent")
+    sort_frame.pack(fill='x', padx=10, pady=5)
+    
+    create_samurai_label(sort_frame, "Сортировка:", text_color=SAMURAI_TEXT).pack(side='left', padx=5)
+    
+    sort_var = ctk.StringVar(value="name_asc")
+    
+    sort_options = [
+        ("По имени (А→Я)", "name_asc"),
+        ("По имени (Я→А)", "name_desc"),
+        ("Сначала новые", "date_desc"),
+        ("Сначала старые", "date_asc"),
+        ("По количеству цитат", "quotes_desc")
+    ]
+    
+    sort_combo = ctk.CTkComboBox(
+        sort_frame,
+        values=[opt[0] for opt in sort_options],
+        fg_color=SAMURAI_PANEL,
+        border_color=SAMURAI_GOLD,
+        button_color=SAMURAI_RED,
+        button_hover_color=SAMURAI_RED_HOVER,
+        dropdown_fg_color=SAMURAI_PANEL,
+        dropdown_hover_color=SAMURAI_RED,
+        width=200
+    )
+    sort_combo.pack(side='left', padx=5)
+    sort_combo.set("По имени (А→Я)")
+    
+    
+    filter_status_frame = create_samurai_frame(filter_frame, fg_color="transparent")
+    filter_status_frame.pack(fill='x', padx=10, pady=5)
+    
+    create_samurai_label(filter_status_frame, "Статус:", text_color=SAMURAI_TEXT).pack(side='left', padx=5)
+    
+    status_var = ctk.StringVar(value="all")
+    
+    ctk.CTkRadioButton(
+        filter_status_frame,
+        text="Все",
+        variable=status_var,
+        value="all",
+        command=lambda: load_categories(),
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
+    ctk.CTkRadioButton(
+        filter_status_frame,
+        text="Активные",
+        variable=status_var,
+        value="active",
+        command=lambda: load_categories(),
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
+    ctk.CTkRadioButton(
+        filter_status_frame,
+        text="Скрытые",
+        variable=status_var,
+        value="deleted",
+        command=lambda: load_categories(),
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
+    def apply_filters():
+        load_categories()
+    
+    create_samurai_button(
+        filter_frame,
+        "🔍 Применить",
+        apply_filters,
+        width=100
+    ).pack(pady=10)
+    
+    create_samurai_button(
+        filter_frame,
+        "🔄 Сбросить",
+        lambda: [search_entry.delete(0, 'end'), 
+                sort_combo.set("По имени (А→Я)"),
+                status_var.set("all"),
+                load_categories()],
+        width=100
+    ).pack(pady=10)
+    
+    
     categories_container = create_samurai_frame(main_container, fg_color=SAMURAI_BG)
     categories_container.pack(fill='both', expand=True)
     
     def load_categories():
-        """Загрузка списка категорий"""
         for widget in categories_container.winfo_children():
             widget.destroy()
         
         try:
+            query = Category.select()
             
-            if current_user['role'] == 'администратор':
-                categories = Category.select().order_by(Category.name)
-            else:
-                categories = Category.select().where(Category.is_deleted == False).order_by(Category.name)
+            if status_var.get() == "active":
+                query = query.where(Category.is_deleted == False)
+            elif status_var.get() == "deleted":
+                query = query.where(Category.is_deleted == True)
+            
+            search_text = search_entry.get().strip()
+            if search_text:
+                query = query.where(
+                    (Category.name.contains(search_text)) | 
+                    (Category.description.contains(search_text))
+                )
+            
+            sort_option = sort_combo.get()
+            sort_map = {
+                "По имени (А→Я)": Category.name.asc(),
+                "По имени (Я→А)": Category.name.desc(),
+                "Сначала новые": Category.created_at.desc(),
+                "Сначала старые": Category.created_at.asc()
+            }
+            
+            if sort_option in sort_map:
+                query = query.order_by(sort_map[sort_option])
+            
+            categories = list(query)
+            
+            if sort_option == "По количеству цитат":
+                categories.sort(key=lambda c: CategoryQuote.select().where(
+                    CategoryQuote.category == c.id
+                ).count(), reverse=True)
             
             if not categories:
                 no_cat_frame = create_samurai_frame(categories_container, border_color=SAMURAI_GOLD)
@@ -1688,28 +1812,26 @@ def categories_main_window():
                 
                 create_samurai_label(
                     no_cat_frame, 
-                    "Пока нет созданных категорий", 
+                    "Нет категорий, соответствующих фильтрам", 
                     text_color=SAMURAI_TEXT_SECONDARY
                 ).pack(pady=50)
                 return
             
             for category in categories:
+                quotes_count = CategoryQuote.select().where(
+                    CategoryQuote.category == category.id
+                ).count()
                 
                 cat_card = create_samurai_frame(categories_container, border_color=SAMURAI_GOLD)
                 cat_card.pack(fill='x', pady=10)
                 
-                
                 header_frame = create_samurai_frame(cat_card, fg_color=SAMURAI_PANEL)
                 header_frame.pack(fill='x', padx=10, pady=10)
-                
                 
                 info_frame = create_samurai_frame(header_frame, fg_color="transparent")
                 info_frame.pack(side='left', fill='x', expand=True)
                 
-                
-                status_text = ""
-                if category.is_deleted:
-                    status_text = " [СКРЫТА]"
+                status_text = " [СКРЫТА]" if category.is_deleted else ""
                 
                 create_samurai_label(
                     info_frame,
@@ -1726,115 +1848,73 @@ def categories_main_window():
                         text_color=SAMURAI_TEXT_SECONDARY
                     ).pack(anchor='w')
                 
-                
-                quotes_count = CategoryQuote.select().where(
-                    CategoryQuote.category == category.id
-                ).count()
-                
                 create_samurai_label(
                     info_frame,
-                    f"Цитат в категории: {quotes_count}",
-                    font=FONT_BOLD,
+                    f"Цитат: {quotes_count} | Создана: {category.created_at.strftime('%d.%m.%Y')}",
+                    font=FONT_PRIMARY,
                     text_color=SAMURAI_TEXT
                 ).pack(anchor='w', pady=(5, 0))
-                
                 
                 if current_user['role'] == 'администратор':
                     btn_frame = create_samurai_frame(header_frame, fg_color="transparent")
                     btn_frame.pack(side='right', padx=5)
                     
-                    
-                    edit_btn = create_samurai_button(
+                    manage_btn = create_samurai_button(
                         btn_frame,
-                        "✏️",
-                        lambda c=category: edit_category_window(c, refresh_callback=load_categories) if not c.is_deleted else None,
-                        width=40,
-                        height=30,
-                        font=("Segoe UI", 12)
+                        "⚙️ Управлять",
+                        lambda c=category: manage_category_quotes_window(c, refresh_callback=lambda: load_categories()),
+                        width=100,
+                        height=30
                     )
-                    edit_btn.pack(side='left', padx=2)
-                    if category.is_deleted:
-                        edit_btn.configure(state="disabled")
-                        edit_btn.bind("<Enter>", lambda e: show_tooltip(e, "Нельзя редактировать скрытую категорию"))
-                        edit_btn.bind("<Leave>", lambda e: hide_tooltip(e))
-                    
+                    manage_btn.pack(side='left', padx=2)
                     
                     if not category.is_deleted:
-                        
                         hide_btn = create_samurai_button(
                             btn_frame,
-                            "👻",
-                            lambda c=category: delete_category(c, refresh_callback=load_categories),
-                            width=40,
+                            "👻 Скрыть",
+                            lambda c=category: soft_delete_category(c, refresh_callback=lambda: load_categories()),
+                            width=80,
                             height=30,
-                            color=SAMURAI_RED if quotes_count == 0 else SAMURAI_PANEL,
-                            hover_color=SAMURAI_RED_HOVER if quotes_count == 0 else "#333",
-                            font=("Segoe UI", 12)
+                            color=SAMURAI_RED if quotes_count == 0 else SAMURAI_PANEL
                         )
                         hide_btn.pack(side='left', padx=2)
-                        
-                        
                         if quotes_count > 0:
                             hide_btn.configure(state="disabled")
                             hide_btn.bind("<Enter>", lambda e: show_tooltip(e, "Сначала удалите все цитаты из категории"))
                             hide_btn.bind("<Leave>", lambda e: hide_tooltip(e))
-                    else:
                         
+                        if is_main_admin():
+                            delete_btn = create_samurai_button(
+                                btn_frame,
+                                "💀 Удалить",
+                                lambda c=category: hard_delete_category(c, refresh_callback=lambda: load_categories()),
+                                width=80,
+                                height=30,
+                                color=SAMURAI_RED,
+                                hover_color=SAMURAI_RED_HOVER
+                            )
+                            delete_btn.pack(side='left', padx=2)
+                            delete_btn.bind("<Enter>", lambda e: show_tooltip(e, "ПОЛНОСТЬЮ УДАЛИТЬ ИЗ БД"))
+                            delete_btn.bind("<Leave>", lambda e: hide_tooltip(e))
+                    else:
                         restore_btn = create_samurai_button(
                             btn_frame,
-                            "🔄",
-                            lambda c=category: restore_category(c, refresh_callback=load_categories),
-                            width=40,
+                            "🔄 Восстановить",
+                            lambda c=category: restore_category(c, refresh_callback=lambda: load_categories()),
+                            width=100,
                             height=30,
                             color=SAMURAI_GREEN,
-                            hover_color=SAMURAI_GREEN_HOVER,
-                            font=("Segoe UI", 12)
+                            hover_color=SAMURAI_GREEN_HOVER
                         )
                         restore_btn.pack(side='left', padx=2)
-                        restore_btn.bind("<Enter>", lambda e: show_tooltip(e, "Восстановить категорию"))
-                        restore_btn.bind("<Leave>", lambda e: hide_tooltip(e))
-                    
-                    
-                    if is_main_admin() and category.is_deleted:
-                        hard_delete_btn = create_samurai_button(
-                            btn_frame,
-                            "💀",
-                            lambda c=category: hard_delete_category(c, refresh_callback=load_categories),
-                            width=40,
-                            height=30,
-                            color=SAMURAI_RED,
-                            hover_color=SAMURAI_RED_HOVER,
-                            font=("Segoe UI", 12)
-                        )
-                        hard_delete_btn.pack(side='left', padx=2)
-                        hard_delete_btn.bind("<Enter>", lambda e: show_tooltip(e, "ПОЛНОСТЬЮ УДАЛИТЬ ИЗ БД"))
-                        hard_delete_btn.bind("<Leave>", lambda e: hide_tooltip(e))
-                
-                
-                manage_frame = create_samurai_frame(cat_card, fg_color=SAMURAI_BG)
-                manage_frame.pack(fill='x', padx=10, pady=(0, 10))
-                
                 
                 view_btn = create_samurai_button(
-                    manage_frame,
+                    cat_card,
                     "📖 Просмотреть цитаты",
                     lambda c=category: show_category_quotes_window(c),
-                    color=SAMURAI_RED,
-                    width=180
+                    width=200
                 )
-                view_btn.pack(side='left', padx=5)
-                
-                
-                if current_user['role'] == 'администратор' and not category.is_deleted:
-                    manage_quotes_btn = create_samurai_button(
-                        manage_frame,
-                        "⚙️ Управлять цитатами",
-                        lambda c=category: manage_category_quotes_window(c, refresh_callback=load_categories),
-                        color=SAMURAI_GREEN,
-                        hover_color=SAMURAI_GREEN_HOVER,
-                        width=180
-                    )
-                    manage_quotes_btn.pack(side='left', padx=5)
+                view_btn.pack(pady=10)
         
         except Exception as e:
             logger.error(f"Ошибка загрузки категорий: {e}")
@@ -1844,12 +1924,12 @@ def categories_main_window():
                 text_color=SAMURAI_RED
             ).pack(pady=50)
     
-    
     load_categories()
+    
+    search_entry.bind("<Return>", lambda e: load_categories())
 
 
 def add_category_window(refresh_callback):
-    """Окно добавления новой категории"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может создавать категории")
         return
@@ -1939,7 +2019,6 @@ def add_category_window(refresh_callback):
 
 
 def edit_category_window(category, refresh_callback):
-    """Окно редактирования категории"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может редактировать категории")
         return
@@ -2030,47 +2109,7 @@ def edit_category_window(category, refresh_callback):
     ).pack(side='right', padx=5)
 
 
-def delete_category(category, refresh_callback):
-    """Мягкое удаление категории (доступно всем админам)"""
-    if current_user['role'] != 'администратор':
-        messagebox.showerror("Ошибка", "Только Сёгун может удалять категории")
-        return
-    
-    
-    quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
-    if quotes_count > 0:
-        messagebox.showerror("Ошибка", 
-                           f"Нельзя удалить категорию с цитатами.\n"
-                           f"Сначала удалите все цитаты из категории (сейчас: {quotes_count} цитат).")
-        return
-    
-    if messagebox.askyesno("Подтверждение", 
-                          f"Вы уверены, что хотите скрыть категорию '{category.name}'?\n\n"
-                          f"Категория будет помечена как удаленная, но останется в БД.\n"
-                          f"Полное удаление доступно только главному Сёгуну."):
-        try:
-            
-            category.is_deleted = True
-            category.save()
-            
-            
-            AdminActionLog.create(
-                admin_username=current_user['username'],
-                action_type='soft_delete_category',
-                target_username='System',
-                details=f"Скрыта категория: {category.name} (ID: {category.id})"
-            )
-            
-            messagebox.showinfo("Успех", f"Категория '{category.name}' скрыта")
-            refresh_callback()  
-            
-        except Exception as e:
-            logger.error(f"Ошибка скрытия категории: {e}")
-            messagebox.showerror("Ошибка", f"Не удалось скрыть категорию: {str(e)}")
-
-
 def show_category_quotes_window(category):
-    """Окно просмотра цитат в категории (доступно всем пользователям)"""
     if not check_auth():
         return
     
@@ -2177,14 +2216,13 @@ def show_category_quotes_window(category):
 
 
 def manage_category_quotes_window(category, refresh_callback):
-    """Окно управления цитатами в категории (только для админов)"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может управлять цитатами в категориях")
         return
     
     manage_win = ctk.CTkToplevel(root)
     manage_win.title(f"Управление цитатами в категории: {category.name}")
-    manage_win.geometry("1200x700")
+    manage_win.geometry("1400x800")
     manage_win.configure(fg_color=SAMURAI_BG)
     manage_win.transient(root)
     manage_win.grab_set()
@@ -2243,7 +2281,6 @@ def manage_category_quotes_window(category, refresh_callback):
     quotes_in_cat_tab = tabview.tab("Цитаты в категории")
     
     def load_category_quotes_tab_content(parent_tab, cat, refresh):
-        
         for widget in parent_tab.winfo_children():
             widget.destroy()
         
@@ -2369,16 +2406,18 @@ def manage_category_quotes_window(category, refresh_callback):
         tree_frame = create_samurai_frame(table_frame, fg_color=SAMURAI_BG)
         tree_frame.pack(fill='both', expand=True)
         
-        columns = ("type", "text", "author")
-        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+        columns = ("type", "text", "author", "added")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20, selectmode='extended')
         
         tree.heading("type", text="Тип")
         tree.heading("text", text="Цитата")
         tree.heading("author", text="Автор")
+        tree.heading("added", text="Дата добавления")
         
-        tree.column("type", width=100, anchor="w", stretch=True)
-        tree.column("text", width=700, anchor="w", stretch=True)
-        tree.column("author", width=200, anchor="w", stretch=True)
+        tree.column("type", width=100, anchor="w")
+        tree.column("text", width=700, anchor="w")
+        tree.column("author", width=200, anchor="w")
+        tree.column("added", width=150, anchor="w")
         
         
         for col in columns:
@@ -2394,8 +2433,8 @@ def manage_category_quotes_window(category, refresh_callback):
         
         
         context_menu = Menu(root, tearoff=0, bg=SAMURAI_PANEL, fg="white")
-        context_menu.add_command(label="🗑️ Удалить из категории", 
-                                command=lambda: remove_from_category(tree, cat, refresh))
+        context_menu.add_command(label="🗑️ Удалить выбранные из категории", 
+                                command=lambda: remove_selected_from_category(tree, cat, refresh))
         context_menu.add_separator()
         context_menu.add_command(label="❌ Отмена")
         
@@ -2406,10 +2445,9 @@ def manage_category_quotes_window(category, refresh_callback):
                 context_menu.post(event.x_root, event.y_root)
         
         tree.bind("<Button-3>", show_context_menu)
-        tree.bind("<Delete>", lambda e: remove_from_category(tree, cat, refresh))
+        tree.bind("<Delete>", lambda e: remove_selected_from_category(tree, cat, refresh))
         
         def load_quotes(search_text="", sort_order="default"):
-            """Загрузка цитат категории с фильтрацией и сортировкой"""
             for item in tree.get_children():
                 tree.delete(item)
             
@@ -2432,6 +2470,8 @@ def manage_category_quotes_window(category, refresh_callback):
                     query = query.order_by(CategoryQuote.quote_text.asc())
                 elif sort_order == "desc":
                     query = query.order_by(CategoryQuote.quote_text.desc())
+                else:
+                    query = query.order_by(CategoryQuote.added_at.desc())
                 
                 type_labels = {
                     'motivation': 'Мотивация',
@@ -2445,10 +2485,13 @@ def manage_category_quotes_window(category, refresh_callback):
                     if len(display_text) > 80:
                         display_text = display_text[:80] + "..."
                     
+                    added_date = rel.added_at.strftime('%d.%m.%Y') if rel.added_at else "—"
+                    
                     tree.insert("", "end", values=(
                         type_labels.get(rel.quote_type, rel.quote_type),
                         display_text,
-                        rel.quote_author
+                        rel.quote_author,
+                        added_date
                     ), tags=(rel.id,))
             
             except Exception as e:
@@ -2469,11 +2512,9 @@ def manage_category_quotes_window(category, refresh_callback):
 
 
 def load_add_quotes_tab(parent, category, refresh_callback):
-    """Загрузка вкладки добавления цитат из существующих"""
     
     
     def get_model_by_type(type_str):
-        """Получение модели по типу"""
         if type_str == "Мотивация":
             return Motivation
         elif type_str == "Аффирмации":
@@ -2516,7 +2557,6 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     search_entry.pack(side='left', padx=5)
     
     def search_quotes():
-        """Поиск цитат"""
         load_quotes_list(search_entry.get().strip())
     
     create_samurai_button(
@@ -2533,22 +2573,84 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         width=100
     ).pack(side='left', padx=5)
     
+    author_filter_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
+    author_filter_frame.pack(fill='x', pady=5)
+    
+    create_samurai_label(author_filter_frame, "Фильтр по автору:", 
+                        text_color=SAMURAI_TEXT).pack(side='left', padx=5)
+    
+    author_var = ctk.StringVar(value="Все")
+    author_combo = ctk.CTkComboBox(
+        author_filter_frame,
+        values=["Все"],
+        variable=author_var,
+        fg_color=SAMURAI_PANEL,
+        border_color=SAMURAI_GOLD,
+        button_color=SAMURAI_RED,
+        button_hover_color=SAMURAI_RED_HOVER,
+        dropdown_fg_color=SAMURAI_PANEL,
+        dropdown_hover_color=SAMURAI_RED,
+        width=200,
+        command=lambda x: load_quotes_list(search_entry.get().strip())
+    )
+    author_combo.pack(side='left', padx=5)
+    
+    sort_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
+    sort_frame.pack(fill='x', pady=5)
+    
+    create_samurai_label(sort_frame, "Сортировка:", text_color=SAMURAI_TEXT).pack(side='left', padx=5)
+    
+    sort_var = ctk.StringVar(value="default")
+    
+    def sort_quotes():
+        load_quotes_list(search_entry.get().strip())
+    
+    ctk.CTkRadioButton(
+        sort_frame,
+        text="По умолчанию",
+        variable=sort_var,
+        value="default",
+        command=sort_quotes,
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
+    ctk.CTkRadioButton(
+        sort_frame,
+        text="А→Я",
+        variable=sort_var,
+        value="asc",
+        command=sort_quotes,
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
+    ctk.CTkRadioButton(
+        sort_frame,
+        text="Я→А",
+        variable=sort_var,
+        value="desc",
+        command=sort_quotes,
+        fg_color=SAMURAI_RED,
+        text_color=SAMURAI_TEXT
+    ).pack(side='left', padx=10)
+    
     
     table_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     table_frame.pack(fill='both', expand=True, pady=10)
     
     columns = ("id", "text", "author", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=20)
+    tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=20, selectmode='extended')
     
     tree.heading("id", text="ID")
     tree.heading("text", text="Цитата")
     tree.heading("author", text="Автор")
     tree.heading("status", text="Статус")
     
-    tree.column("id", width=50, anchor="w", stretch=True)
-    tree.column("text", width=600, anchor="w", stretch=True)
-    tree.column("author", width=200, anchor="w", stretch=True)
-    tree.column("status", width=100, anchor="w", stretch=True)
+    tree.column("id", width=50, anchor="w")
+    tree.column("text", width=600, anchor="w")
+    tree.column("author", width=200, anchor="w")
+    tree.column("status", width=100, anchor="w")
     
     scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -2558,77 +2660,26 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     
     setup_touchpad_scrolling(tree)
     
+    context_menu = Menu(root, tearoff=0, bg=SAMURAI_PANEL, fg="white")
+    context_menu.add_command(label="➕ Добавить выбранные в категорию", 
+                            command=lambda: add_selected_to_category(tree, category, quote_type_var.get(), refresh_callback))
+    context_menu.add_separator()
+    context_menu.add_command(label="❌ Отмена")
     
-    def add_single_quote_to_category(item_id):
-        """Добавление одной цитаты в категорию"""
-        item = tree.item(item_id)
-        values = item["values"]
-        
-        try:
-            quote_id = int(values[0])
-            model = get_model_by_type(quote_type_var.get())
-            type_key = quote_type_var.get().lower() if quote_type_var.get() != "Аффирмации" else "affirmation"
-            if type_key == "аффирмации":
-                type_key = "affirmation"
-            
-            
-            quote = model.get_by_id(quote_id)
-            
-            
-            try:
-                CategoryQuote.get(
-                    (CategoryQuote.category == category.id) &
-                    (CategoryQuote.quote_text == quote.text)
-                )
-                messagebox.showinfo("Информация", "Эта цитата уже есть в категории")
-                return
-            except CategoryQuote.DoesNotExist:
-                pass
-            
-            
-            CategoryQuote.create(
-                category=category.id,
-                quote_type=type_key,
-                quote_text=quote.text,
-                quote_author=quote.author if quote.author else "Неизвестный"
-            )
-            
-            
-            AdminActionLog.create(
-                admin_username=current_user['username'],
-                action_type='add_quote_to_category',
-                target_username='System',
-                details=f"Добавлена цитата в категорию {category.name}"
-            )
-            
-            messagebox.showinfo("Успех", "Цитата добавлена в категорию")
-            
-            
-            tree.delete(item_id)
-            refresh_callback()  
-            
-        except Exception as e:
-            logger.error(f"Ошибка добавления цитаты: {e}")
-            messagebox.showerror("Ошибка", f"Не удалось добавить цитату: {str(e)}")
+    def show_context_menu(event):
+        item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)
+            context_menu.post(event.x_root, event.y_root)
     
+    tree.bind("<Button-3>", show_context_menu)
     
     def on_double_click(event):
-        """Обработка двойного клика по цитате"""
         selection = tree.selection()
-        if not selection:
-            return
-        
-        item_id = selection[0]
-        values = tree.item(item_id, "values")
-        
-        
-        if values and len(values) > 1 and values[1] not in ["Нет доступных цитат для добавления", "Ошибка загрузки:"]:
-            
-            if messagebox.askyesno("Подтверждение", "Добавить эту цитату в категорию?"):
-                add_single_quote_to_category(item_id)
+        if selection:
+            add_selected_to_category(tree, category, quote_type_var.get(), refresh_callback)
     
     tree.bind("<Double-1>", on_double_click)
-    
     
     btn_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     btn_frame.pack(fill='x', pady=10)
@@ -2642,25 +2693,27 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         width=250
     ).pack()
     
-    
     hint_label = create_samurai_label(
         btn_frame,
-        "💡 Подсказка: дважды кликните по цитате для быстрого добавления",
+        "💡 Подсказка: используйте Ctrl+клик для множественного выбора, Shift для диапазона",
         text_color=SAMURAI_TEXT_SECONDARY,
         font=('Segoe UI', 9, 'italic')
     )
     hint_label.pack(pady=5)
     
     def load_quotes_list(search_text=""):
-        """Загрузка списка цитат"""
         for item in tree.get_children():
             tree.delete(item)
         
         try:
             model = get_model_by_type(quote_type_var.get())
-            type_key = quote_type_var.get().lower() if quote_type_var.get() != "Аффирмации" else "affirmation"
+            type_key = quote_type_var.get().lower()
             if type_key == "аффирмации":
                 type_key = "affirmation"
+            elif type_key == "мотивация":
+                type_key = "motivation"
+            elif type_key == "юмор":
+                type_key = "funny"
             
             
             added_quotes = CategoryQuote.select().where(
@@ -2671,25 +2724,42 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             
             query = model.select().where(model.is_deleted == False)
             
+            
             if search_text:
                 query = query.where(model.text.contains(search_text))
             
-            for quote in query:
-                if quote.text not in added_texts:
-                    status = "Активна"
-                    display_text = quote.text
-                    if len(display_text) > 80:
-                        display_text = display_text[:80] + "..."
-                    
-                    tree.insert("", "end", values=(
-                        quote.id,
-                        display_text,
-                        quote.author if quote.author else "—",
-                        status
-                    ))
+            
+            quotes_list = list(query)
             
             
-            if not tree.get_children():
+            if quotes_list:
+                
+                authors = set(q.author for q in quotes_list if q.author)
+                author_combo.configure(values=["Все"] + sorted(list(authors)))
+            
+            
+            filtered_quotes = [q for q in quotes_list if q.text not in added_texts]
+            
+            
+            if sort_var.get() == "asc":
+                filtered_quotes.sort(key=lambda x: x.text)
+            elif sort_var.get() == "desc":
+                filtered_quotes.sort(key=lambda x: x.text, reverse=True)
+            
+            for quote in filtered_quotes:
+                display_text = quote.text
+                if len(display_text) > 80:
+                    display_text = display_text[:80] + "..."
+                
+                tree.insert("", "end", values=(
+                    quote.id,
+                    display_text,
+                    quote.author if quote.author else "—",
+                    "Активна"
+                ))
+            
+            
+            if not filtered_quotes:
                 tree.insert("", "end", values=(
                     "",
                     "Нет доступных цитат для добавления",
@@ -2712,13 +2782,13 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     
     quote_type_var.trace_add("write", on_type_change)
     search_entry.bind("<Return>", lambda e: search_quotes())
+    author_var.trace_add("write", lambda *args: load_quotes_list(search_entry.get().strip()))
     
     
     load_quotes_list()
 
 
 def add_selected_to_category(tree, category, type_str, refresh_callback):
-    """Добавление выбранных цитат в категорию"""
     selection = tree.selection()
     if not selection:
         messagebox.showwarning("Выбор", "Выберите цитаты для добавления")
@@ -2734,16 +2804,24 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             return FunnyQuote
     
     model = get_model_by_type(type_str)
-    type_key = type_str.lower() if type_str != "Аффирмации" else "affirmation"
+    type_key = type_str.lower()
     if type_key == "аффирмации":
         type_key = "affirmation"
+    elif type_key == "мотивация":
+        type_key = "motivation"
+    elif type_key == "юмор":
+        type_key = "funny"
     
     added_count = 0
+    skipped_count = 0
+    errors = []
+    
     for item in selection:
         values = tree.item(item, "values")
         try:
             quote_id = int(values[0])
         except (ValueError, IndexError):
+            skipped_count += 1
             continue
         
         try:
@@ -2756,6 +2834,7 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
                     (CategoryQuote.category == category.id) &
                     (CategoryQuote.quote_text == quote.text)
                 )
+                skipped_count += 1
                 continue  
             except CategoryQuote.DoesNotExist:
                 pass
@@ -2769,8 +2848,12 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             )
             added_count += 1
             
+            
+            tree.delete(item)
+            
         except Exception as e:
             logger.error(f"Ошибка добавления цитаты {quote_id}: {e}")
+            errors.append(str(e))
     
     if added_count > 0:
         AdminActionLog.create(
@@ -2780,22 +2863,62 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             details=f"Добавлено {added_count} цитат в категорию {category.name}"
         )
         
-        messagebox.showinfo("Успех", f"Добавлено {added_count} цитат в категорию")
+        message = f"✅ Добавлено: {added_count} цитат\n"
+        if skipped_count > 0:
+            message += f"⏭️ Пропущено (уже есть): {skipped_count}\n"
+        if errors:
+            message += f"❌ Ошибок: {len(errors)}"
         
-
-        for item in selection:
-            try:
-                tree.delete(item)
-            except:
-                pass
+        messagebox.showinfo("Результат", message)
         
         refresh_callback()  
     else:
         messagebox.showinfo("Информация", "Ни одна из выбранных цитат не была добавлена")
 
 
+def remove_selected_from_category(tree, category, refresh_callback):
+    if current_user['role'] != 'администратор':
+        messagebox.showerror("Ошибка", "Только Сёгун может удалять цитаты из категорий")
+        return
+    
+    selection = tree.selection()
+    if not selection:
+        messagebox.showwarning("Выбор", "Выберите цитаты для удаления")
+        return
+    
+    quote_texts = []
+    for item in selection:
+        values = tree.item(item, "values")
+        if len(values) > 1:
+            quote_texts.append(values[1])
+    
+    if messagebox.askyesno("Подтверждение", 
+                          f"Убрать выбранные цитаты из категории?\n\n"
+                          f"Выбрано: {len(selection)} цитат\n\n"
+                          f"Это действие нельзя отменить."):
+        removed_count = 0
+        for item in selection:
+            try:
+                rel_id = tree.item(item, "tags")[0]
+                CategoryQuote.delete().where(CategoryQuote.id == rel_id).execute()
+                tree.delete(item)
+                removed_count += 1
+            except Exception as e:
+                logger.error(f"Ошибка удаления из категории: {e}")
+        
+        if removed_count > 0:
+            AdminActionLog.create(
+                admin_username=current_user['username'],
+                action_type='remove_quotes_from_category',
+                target_username='System',
+                details=f"Удалено {removed_count} цитат из категории {category.name}"
+            )
+            
+            messagebox.showinfo("Успех", f"Удалено {removed_count} цитат из категории")
+            refresh_callback()
+
+
 def remove_all_from_category(category, refresh_callback, load_quotes_callback):
-    """Удаление всех цитат из категории"""
     if current_user['role'] != 'администратор':
         messagebox.showerror("Ошибка", "Только Сёгун может удалять цитаты из категорий")
         return
@@ -2832,50 +2955,7 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
             messagebox.showerror("Ошибка", f"Не удалось удалить цитаты: {str(e)}")
 
 
-def remove_from_category(tree, category, refresh_callback):
-    """Удаление цитаты из категории"""
-    if current_user['role'] != 'администратор':
-        messagebox.showerror("Ошибка", "Только Сёгун может удалять цитаты из категорий")
-        return
-    
-    selection = tree.selection()
-    if not selection:
-        messagebox.showwarning("Выбор", "Выберите цитату для удаления")
-        return
-    
-    item = selection[0]
-    values = tree.item(item, "values")
-    rel_id = tree.item(item, "tags")[0]
-    
-    quote_text = values[1] if len(values) > 1 else "неизвестная цитата"
-    
-    if messagebox.askyesno("Подтверждение", 
-                          f"Убрать эту цитату из категории?\n\n"
-                          f"Цитата: \"{quote_text}\"\n\n"
-                          f"Это действие нельзя отменить."):
-        try:
-            CategoryQuote.delete().where(CategoryQuote.id == rel_id).execute()
-            
-            AdminActionLog.create(
-                admin_username=current_user['username'],
-                action_type='remove_quote_from_category',
-                target_username='System',
-                details=f"Удалена цитата из категории {category.name}"
-            )
-            
-            messagebox.showinfo("Успех", "Цитата убрана из категории")
-            tree.delete(item)
-            refresh_callback()  
-            
-        except Exception as e:
-            logger.error(f"Ошибка удаления из категории: {e}")
-            messagebox.showerror("Ошибка", f"Не удалось удалить цитату: {str(e)}")
-
-
-
-
 def show_tooltip(event, text):
-    """Показать всплывающую подсказку"""
     try:
         tooltip = tk.Toplevel(root)
         tooltip.wm_overrideredirect(True)
@@ -2892,15 +2972,12 @@ def show_tooltip(event, text):
         pass
 
 def hide_tooltip(event):
-    """Скрыть всплывающую подсказку"""
     if hasattr(event.widget, 'tooltip'):
         try:
             event.widget.tooltip.destroy()
         except:
             pass
         delattr(event.widget, 'tooltip')
-
-
 
 
 def developer_window():
@@ -2959,7 +3036,6 @@ def developer_window():
 
 
 def load_requests_tab(parent):
-    """Загрузка вкладки управления заявками"""
     status_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     status_frame.pack(fill='x', pady=5)
     
@@ -3124,7 +3200,6 @@ def manage_quotes_window():
 
 
 def load_quotes_tab(parent, ModelClass, quote_type):
-    """Загрузка вкладки управления цитатами"""
     btn_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     btn_frame.pack(fill='x', pady=10)
     
@@ -3432,7 +3507,6 @@ def delete_selected_quote(tree, quote_type):
 
 
 def update_parser_file():
-    """Обновление файла parser.py"""
     try:
         motivations_data = []
         affirmations_data = []
@@ -3494,8 +3568,6 @@ def logout():
     global current_user
     current_user = None
     show_auth_window()
-
-
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from peewee import (
 import datetime
 import logging
 
-# Настройка БД (убедитесь, что параметры подключения верны)
+
 db = MySQLDatabase(
     'motivation',
     user='root',
@@ -20,7 +20,7 @@ class BaseModel(Model):
 class Motivation(BaseModel):
     text = CharField(max_length=512, unique=True)
     author = CharField()
-    is_deleted = BooleanField(default=False)  # Мягкое удаление
+    is_deleted = BooleanField(default=False)  
 
 class Affirmation(BaseModel):
     text = CharField(max_length=512, unique=True)
