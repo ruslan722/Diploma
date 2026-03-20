@@ -10,7 +10,7 @@ db = MySQLDatabase(
     user='root',
     password='root',
     host='localhost',
-    port=3307
+    port=3306
 )
 
 class BaseModel(Model):
@@ -62,8 +62,8 @@ class UserReaction(BaseModel):
 
 class UserProfile(BaseModel):
     username = CharField(unique=True)
-    nickname = CharField(default='')  # Отображаемое имя
-    avatar_path = CharField(default='')  # Путь к аватарке
+    nickname = CharField(default='')  
+    avatar_path = CharField(default='')  
     created_at = DateTimeField(default=datetime.datetime.now)
 
 class AdminActionLog(BaseModel):
@@ -112,7 +112,7 @@ def init_db():
         Category, CategoryQuote  # Добавлены новые таблицы
     ], safe=True)
     
-    # Простая миграция для добавления колонок в существующие таблицы
+    
     try:
         from playhouse.migrate import MySQLMigrator, migrate
         migrator = MySQLMigrator(db)
@@ -133,7 +133,7 @@ def init_db():
             migrate(migrator.add_column('categories', 'is_deleted', BooleanField(default=False)))
         except: pass
         
-        # Добавляем added_at в таблицу category_quotes, если его нет
+        
         try:
             migrate(migrator.add_column('category_quotes', 'added_at', DateTimeField(default=datetime.datetime.now)))
         except: pass

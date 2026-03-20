@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Категории цитат</title>
+    <link rel="stylesheet" href="/static/style.css">    
+    <script src="/static/js/app.js"></script>
+
+    
+
+</head>
+<body>
+    <div class="container">
+        <h1>Категории цитат</h1>
+        <div id="quotes-container">
+            {% for category in categories %}
+                <div class="quote-card">
+                    <p class="name">{{ category.name }}</p>
+                    <p class="description"> {{ category.description }}</p>
+                    <p class="is_deleted"> {{ category.is_deleted }}</p>
+                    <p class="created_at"> {{ category.created_at }}</p>
+                    
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+</body>
+</html>
