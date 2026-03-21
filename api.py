@@ -113,7 +113,7 @@ async def category_q(request: Request):
     cat_q = CategoryQuote.select()
     category_quotes = [{
         'id' : i.id,
-        'category_id' : i.category_id,
+        'category_id' : i.category,
         'quote_type' : i.quote_type,
         'quote_text' : i.quote_text,
         'quote_author' : i.quote_author,
@@ -123,4 +123,3 @@ async def category_q(request: Request):
     return templates.TemplateResponse("categoryquote.html",
                                        {"request": request,
                                         "category_quotes": category_quotes})
-
