@@ -4,26 +4,146 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Профиль пользователя</title>
-    <link rel="stylesheet" href="/static/profile.css">    
-    <script src="/static/js/app.js"></script>
-
-    
-
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .profile-container { max-width: 800px; margin: 0 auto; }
+        .profile-header { display: flex; align-items: center; gap: 30px; margin-bottom: 30px; flex-wrap: wrap; }
+        .profile-avatar-large { width: 150px; height: 150px; border-radius: 50%; background: var(--accent-color); border: 3px solid var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 60px; color: white; position: relative; overflow: hidden; cursor: pointer; transition: all 0.3s ease; }
+        .profile-avatar-large:hover { opacity: 0.8; }
+        .profile-avatar-large img { width: 100%; height: 100%; object-fit: cover; }
+        .avatar-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: white; padding: 5px; font-size: 12px; text-align: center; opacity: 0; transition: opacity 0.3s ease; }
+        .profile-avatar-large:hover .avatar-overlay { opacity: 1; }
+        .profile-info-large { flex: 1; }
+        .profile-username-large { font-size: 2em; color: var(--primary-color); margin-bottom: 5px; }
+        .profile-nickname-large { font-size: 1.2em; color: var(--text-secondary); margin-bottom: 10px; }
+        .profile-created { color: var(--text-secondary); font-size: 0.9em; }
+        .profile-stats-large { display: flex; gap: 30px; margin-top: 15px; }
+        .stat-card { text-align: center; padding: 10px 20px; background: var(--bg-card); border: 1px solid var(--primary-color); }
+        .stat-value-large { font-size: 2em; font-weight: bold; color: var(--primary-color); }
+        .stat-label-large { color: var(--text-secondary); font-size: 0.9em; }
+        .profile-section { background: var(--bg-card); border: 1px solid var(--primary-color); padding: 25px; margin-bottom: 30px; }
+        .section-title { color: var(--primary-color); font-size: 1.3em; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--primary-color); }
+        .edit-form { display: flex; flex-direction: column; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-label { color: var(--text-secondary); font-weight: bold; }
+        .form-input { padding: 12px 15px; background: var(--bg-darker); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--text-main); font-size: 16px; transition: border-color 0.3s; }
+        .form-input:focus { outline: none; border-color: var(--primary-color); }
+        .form-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .avatar-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .reaction-history { display: flex; flex-direction: column; gap: 10px; }
+        .history-item { display: flex; align-items: center; gap: 15px; padding: 10px; background: var(--bg-darker); border-left: 3px solid var(--primary-color); }
+        .history-reaction { font-size: 20px; }
+        .history-text { flex: 1; color: var(--text-secondary); font-style: italic; }
+        .history-date { color: var(--text-secondary); font-size: 0.8em; }
+        #avatar-upload { display: none; }
+        @media (max-width: 600px) { .profile-header { flex-direction: column; text-align: center; } .profile-stats-large { justify-content: center; } }
+    </style>
+    <script>
+        let currentUser = {{ current_user | tojson | safe }};
+        let isAuthenticated = currentUser.is_authenticated;
+    </script>
 </head>
 <body>
+    <div class="toolbar-controls"><div class="toolbar-item"><button class="profile-toolbar-btn" id="profile-btn" title="Профиль">👤</button></div></div>
     <div class="container">
-        <h1>Профиль пользователя</h1>
-        <div id="quotes-container">
-            {% for quote in profiles %}
-                <div class="quote-card">
-                    <p class="username">{{ quote.username }}</p>
-                    <p class="nickname"> {{ quote.nickname }}</p>
-                    <p class="avatar_path"> {{ quote.avatar_path }}</p>
-                    <p class="created_at"> {{ quote.created_at }}</p>
-                </div>
-            {% endfor %}
-        </div>
+        <header class="main-header"><h1>Информационная система мотивационных высказываний</h1></header>
+        <nav class="tabs-nav">
+            <a href="/" class="tab-item"><span class="tab-title">Главная</span></a>
+            <a href="/motivation" class="tab-item"><span class="tab-title">Мотивация</span></a>
+            <a href="/affirmation" class="tab-item"><span class="tab-title">Аффирмации</span></a>
+            <a href="/funny" class="tab-item"><span class="tab-title">Юмор</span></a>
+            <a href="/category" class="tab-item"><span class="tab-title">Категории</span></a>
+           
+        </nav>
+        <main class="content-area">
+            <div class="profile-container">
+                {% if profiles %}
+                    {% for profile in profiles %}
+                        <div class="profile-header">
+                            <div class="profile-avatar-large" id="avatar-container" onclick="document.getElementById('avatar-upload').click()">
+                                {% if profile.avatar_path %}<img src="{{ profile.avatar_path }}" alt="avatar" id="avatar-img">{% else %}<span id="avatar-initial">{{ profile.nickname|default(profile.username)|first|upper }}</span>{% endif %}
+                                <div class="avatar-overlay">Изменить фото</div>
+                            </div>
+                            <input type="file" id="avatar-upload" accept="image/jpeg,image/png,image/gif,image/webp" onchange="uploadAvatar(event)">
+                            <div class="profile-info-large">
+                                <div class="profile-username-large">@{{ profile.username }}</div>
+                                <div class="profile-nickname-large" id="display-nickname">{{ profile.nickname or profile.username }}</div>
+                                <div class="profile-created">Дата регистрации: {{ profile.created_at.strftime('%d.%m.%Y') if profile.created_at else '' }}</div>
+                                <div class="profile-stats-large">
+                                    <div class="stat-card"><div class="stat-value-large" id="stat-likes">{{ current_user.stats.likes }}</div><div class="stat-label-large">Лайков</div></div>
+                                    <div class="stat-card"><div class="stat-value-large" id="stat-dislikes">{{ current_user.stats.dislikes }}</div><div class="stat-label-large">Дизлайков</div></div>
+                                    <div class="stat-card"><div class="stat-value-large" id="stat-total">{{ current_user.stats.total }}</div><div class="stat-label-large">Всего реакций</div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-section">
+                            <h2 class="section-title">Редактировать профиль</h2>
+                            <form class="edit-form" id="profile-form" onsubmit="updateProfile(event)">
+                                <div class="form-group"><label class="form-label">Отображаемое имя</label><input type="text" class="form-input" id="edit-nickname" name="nickname" value="{{ profile.nickname or '' }}" placeholder="Введите имя"></div>
+                                <div class="form-group"><label class="form-label">Новый пароль (оставьте пустым, чтобы не менять)</label><input type="password" class="form-input" id="edit-password" name="new_password" placeholder="Минимум 4 символа" minlength="4"></div>
+                                <div id="profile-message"></div>
+                                <div class="form-actions"><button type="submit" class="btn">Сохранить изменения</button></div>
+                            </form>
+                            <div class="avatar-actions">
+                                <button class="btn btn-secondary" onclick="document.getElementById('avatar-upload').click()">📷 Загрузить фото</button>
+                                {% if profile.avatar_path %}<button class="btn btn-secondary" onclick="deleteAvatar()">🗑️ Удалить фото</button>{% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}<div class="no-results"><p>👤 Профиль не найден</p></div>{% endif %}
+                {% if reactions_history %}
+                    <div class="profile-section">
+                        <h2 class="section-title">История реакций</h2>
+                        <div class="reaction-history">
+                            {% for r in reactions_history %}
+                                <div class="history-item">
+                                    <span class="history-reaction">{{ '👍' if r.reaction == 'like' else '👎' }}</span>
+                                    <span class="history-text">"{{ r.quote_text }}"</span>
+                                    <span class="history-date">{{ r.created_at.strftime('%d.%m.%Y %H:%M') if r.created_at else '' }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
     </div>
-    
+    <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему"><span class="theme-icon">🌙</span></button>
+
+    <script>
+        const profileBtn = document.getElementById('profile-btn');
+        let authState = { isAuthenticated: false, username: '', nickname: '', avatar_path: null, stats: { likes: 0, dislikes: 0, total: 0 } };
+        let authMode = 'login', authModal = null, lampMode = 'off', rainbowInterval = null;
+
+        async function initAuth() { await checkAuthStatus(); updateProfileButton(); }
+        async function checkAuthStatus() { try { const response = await fetch('/api/auth/me'); if (response.ok) { const data = await response.json(); authState = data; isAuthenticated = data.is_authenticated; currentUser = data; updateProfileButton(); } } catch (error) { console.error('Ошибка проверки авторизации:', error); } }
+        function updateProfileButton() { if (!profileBtn) return; if (authState.is_authenticated && authState.avatar_path) { profileBtn.innerHTML = `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`; profileBtn.style.background = 'transparent'; } else if (authState.is_authenticated) { const initial = (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); profileBtn.innerHTML = initial; profileBtn.style.background = 'var(--accent-color)'; profileBtn.style.color = 'white'; profileBtn.style.fontWeight = 'bold'; } else { profileBtn.innerHTML = '👤'; profileBtn.style.background = ''; profileBtn.style.color = ''; } }
+        function createAuthModal() { const overlay = document.createElement('div'); overlay.className = 'auth-modal-overlay'; overlay.id = 'auth-modal-overlay'; const modal = document.createElement('div'); modal.className = 'auth-modal'; modal.id = 'auth-modal-window'; modal.innerHTML = `<button class="auth-modal-close" onclick="closeAuthModal()">✕</button><div id="auth-modal-content"></div>`; overlay.appendChild(modal); document.body.appendChild(overlay); overlay.addEventListener('click', function(e) { if (e.target === overlay) closeAuthModal(); }); return overlay; }
+        function openAuthModal() { if (!authModal) authModal = createAuthModal(); lampMode = 'off'; renderAuthModalContent(); authModal.classList.add('show'); }
+        function closeAuthModal() { if (authModal) { authModal.classList.remove('show'); stopRainbowAnimation(); const modalWindow = document.getElementById('auth-modal-window'); if (modalWindow) modalWindow.classList.remove('rainbow-theme'); lampMode = 'off'; } }
+        function stopRainbowAnimation() { if (rainbowInterval) { clearInterval(rainbowInterval); rainbowInterval = null; } }
+        function updateRainbowTheme() { const modalWindow = document.getElementById('auth-modal-window'); if (!modalWindow) return; if (lampMode === 'rainbow') modalWindow.classList.add('rainbow-theme'); else modalWindow.classList.remove('rainbow-theme'); }
+        function setFormEnabled(enabled) { const form = document.querySelector('#auth-modal-content form'); if (!form) return; const inputs = form.querySelectorAll('input'); const submitBtn = form.querySelector('button[type="submit"]'); inputs.forEach(input => { input.disabled = !enabled; input.style.opacity = enabled ? '1' : '0.5'; input.style.cursor = enabled ? 'text' : 'not-allowed'; }); if (submitBtn) { submitBtn.disabled = !enabled; submitBtn.style.opacity = enabled ? '1' : '0.5'; submitBtn.style.cursor = enabled ? 'pointer' : 'not-allowed'; } }
+        function toggleLamp() { const lamp = document.querySelector('.auth-lamp'); if (!lamp) return; if (lampMode === 'off') { lampMode = 'rainbow'; updateRainbowTheme(); setFormEnabled(false); } else if (lampMode === 'rainbow') { lampMode = 'on'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(true); } else { lampMode = 'off'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(false); } updateLampDisplay(); }
+        function updateLampDisplay() { const lamp = document.querySelector('.auth-lamp'); const statusText = document.querySelector('.lamp-status-text'); if (!lamp) return; lamp.className = 'auth-lamp ' + lampMode; if (statusText) { if (lampMode === 'off') statusText.textContent = '🔘 Нажми дважды для входа'; else if (lampMode === 'rainbow') statusText.textContent = '🌈 Радужный режим'; else if (lampMode === 'on') statusText.textContent = '✨ Готово к входу'; } }
+        function renderAuthModalContent() { const content = document.getElementById('auth-modal-content'); if (!content) return; if (authState.is_authenticated) renderProfileInModal(content); else renderAuthFormInModal(content); }
+        function renderProfileInModal(container) { const avatarContent = authState.avatar_path ? `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;object-fit:cover;">` : (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); container.innerHTML = `<div class="profile-modal-content"><div class="profile-modal-avatar">${avatarContent}</div><div class="profile-modal-username">${escapeHtml(authState.nickname || authState.username)}</div><div class="profile-modal-nickname">@${escapeHtml(authState.username)}</div><div class="profile-modal-stats"><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.likes || 0}</div><div class="profile-modal-stat-label">Лайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.dislikes || 0}</div><div class="profile-modal-stat-label">Дизлайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.total || 0}</div><div class="profile-modal-stat-label">Всего</div></div></div><div class="profile-modal-actions"><button class="auth-modal-btn" onclick="window.location.href='/profile'; closeAuthModal();">📋 Перейти в профиль</button><button class="auth-modal-btn" style="background: var(--danger-color);" onclick="handleLogout(); closeAuthModal();">🚪 Выйти</button></div></div>`; }
+        function renderAuthFormInModal(container) { const isLogin = authMode === 'login'; const isEnabled = lampMode === 'on'; container.innerHTML = `<div class="auth-lamp-container"><div class="auth-lamp ${lampMode}" onclick="toggleLamp()"><div class="lamp-glow"></div><div class="lamp-bulb"></div><div class="lamp-stem"></div><div class="lamp-base"></div></div><div class="lamp-status-text">${lampMode === 'off' ? '🔘 Нажми дважды для входа' : (lampMode === 'rainbow' ? '🌈 Радужный режим' : '✨ Готово к входу')}</div></div><div class="auth-welcome"><h2>${isLogin ? 'С возвращением' : 'Добро пожаловать'}</h2><p>${isLogin ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт'}</p></div><form onsubmit="handleModalAuthSubmit(event)"><div class="auth-input-group"><label class="auth-input-label">Имя пользователя</label><input type="text" name="username" class="auth-modal-input" placeholder="Введите имя пользователя" required minlength="3" autocomplete="username" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>${!isLogin ? `<div class="auth-input-group"><label class="auth-input-label">Отображаемое имя (необязательно)</label><input type="text" name="nickname" class="auth-modal-input" placeholder="Как вас называть?" autocomplete="nickname" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>` : ''}<div class="auth-input-group"><label class="auth-input-label">Пароль</label><input type="password" name="password" class="auth-modal-input" placeholder="Введите пароль" required minlength="4" autocomplete="${isLogin ? 'current-password' : 'new-password'}" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div><div id="modal-auth-message" class="auth-modal-message"></div><button type="submit" class="auth-modal-btn" id="modal-auth-submit" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>${isLogin ? 'Войти' : 'Зарегистрироваться'}</button></form><div class="auth-modal-links"><a class="auth-modal-link" onclick="switchModalAuthMode('${isLogin ? 'register' : 'login'}')">${isLogin ? 'Создать аккаунт' : 'Уже есть аккаунт?'}</a>${isLogin ? '<a class="auth-modal-link" onclick="showForgotPassword()">Забыли пароль?</a>' : ''}</div>`; }
+        function renderAuthForm() { const container = document.getElementById('auth-modal-content'); if (container) renderAuthFormInModal(container); }
+        function switchModalAuthMode(mode) { authMode = mode; const wasEnabled = lampMode === 'on'; renderAuthForm(); if (wasEnabled) { lampMode = 'on'; setTimeout(() => { setFormEnabled(true); updateLampDisplay(); updateRainbowTheme(); }, 10); } }
+        function showForgotPassword() { showNotification('Функция восстановления пароля в разработке', 'warning'); }
+        async function handleModalAuthSubmit(event) { event.preventDefault(); if (lampMode !== 'on') { showNotification('Включите лампу для авторизации! (Нажмите дважды)', 'warning'); return; } const form = event.target; const data = Object.fromEntries(new FormData(form).entries()); const messageDiv = document.getElementById('modal-auth-message'); const submitBtn = document.getElementById('modal-auth-submit'); messageDiv.innerHTML = ''; messageDiv.className = 'auth-modal-message'; submitBtn.disabled = true; submitBtn.textContent = 'Загрузка...'; try { const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register'; const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await response.json(); if (response.ok && result.success) { messageDiv.className = 'auth-modal-message success'; messageDiv.textContent = result.message; await checkAuthStatus(); showNotification(result.message, 'success'); setTimeout(() => { closeAuthModal(); updateProfileButton(); }, 1000); } else { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = result.message || 'Произошла ошибка'; showNotification(result.message || 'Произошла ошибка', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } } catch (error) { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = 'Ошибка соединения с сервером'; showNotification('Ошибка соединения с сервером', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } }
+        async function handleLogout() { await fetch('/api/auth/logout', { method: 'POST' }); authState = { isAuthenticated: false }; isAuthenticated = false; updateProfileButton(); showNotification('Вы вышли из системы', 'success'); window.location.href = '/'; }
+        async function updateProfile(event) { event.preventDefault(); const form = event.target; const data = Object.fromEntries(new FormData(form).entries()); const messageDiv = document.getElementById('profile-message'); try { const response = await fetch('/api/profile/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await response.json(); if (response.ok && result.success) { messageDiv.style.color = '#4caf50'; messageDiv.textContent = result.message; showNotification(result.message, 'success'); if (data.nickname) document.getElementById('display-nickname').textContent = data.nickname; await checkAuthStatus(); updateProfileButton(); } else { messageDiv.style.color = '#f44336'; messageDiv.textContent = result.message || 'Произошла ошибка'; showNotification(result.message || 'Произошла ошибка', 'error'); } } catch (error) { messageDiv.style.color = '#f44336'; messageDiv.textContent = 'Ошибка соединения с сервером'; showNotification('Ошибка соединения с сервером', 'error'); } }
+        async function uploadAvatar(event) { const file = event.target.files[0]; if (!file) return; if (file.size > 5 * 1024 * 1024) { showNotification('Файл слишком большой (макс 5MB)', 'error'); return; } const formData = new FormData(); formData.append('file', file); try { showNotification('Загрузка аватара...', 'warning'); const response = await fetch('/api/profile/avatar', { method: 'POST', body: formData }); const result = await response.json(); if (response.ok && result.success) { showNotification(result.message, 'success'); const avatarContainer = document.getElementById('avatar-container'); const avatarImg = document.getElementById('avatar-img'); const avatarInitial = document.getElementById('avatar-initial'); if (avatarImg) avatarImg.src = result.avatar_path + '?t=' + new Date().getTime(); else if (avatarInitial) { avatarInitial.remove(); const img = document.createElement('img'); img.id = 'avatar-img'; img.src = result.avatar_path + '?t=' + new Date().getTime(); img.alt = 'avatar'; avatarContainer.insertBefore(img, avatarContainer.firstChild); } await checkAuthStatus(); updateProfileButton(); setTimeout(() => location.reload(), 1000); } else showNotification(result.message || 'Ошибка загрузки', 'error'); } catch (error) { showNotification('Ошибка соединения с сервером', 'error'); } }
+        async function deleteAvatar() { if (!confirm('Удалить аватар?')) return; try { const response = await fetch('/api/profile/avatar', { method: 'DELETE' }); const result = await response.json(); if (response.ok && result.success) { showNotification(result.message, 'success'); await checkAuthStatus(); updateProfileButton(); location.reload(); } else showNotification(result.message || 'Ошибка удаления', 'error'); } catch (error) { showNotification('Ошибка соединения с сервером', 'error'); } }
+        function showNotification(message, type) { const notification = document.createElement('div'); notification.className = `notification notification-${type}`; notification.textContent = message; notification.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;background:${type==='success'?'#4caf50':type==='warning'?'#ff9800':'#f44336'};color:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);z-index:10000;animation:slideIn 0.3s ease;font-weight:bold;`; document.body.appendChild(notification); setTimeout(() => { notification.style.animation = 'slideOut 0.3s ease'; setTimeout(() => notification.remove(), 300); }, 3000); }
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        if (profileBtn) profileBtn.addEventListener('click', function(e) { e.stopPropagation(); openAuthModal(); });
+        function toggleTheme() { const body = document.body, themeIcon = document.querySelector('.theme-icon'); if (body.classList.contains('light-theme')) { body.classList.remove('light-theme'); localStorage.setItem('theme', 'dark'); if (themeIcon) themeIcon.textContent = '🌙'; } else { body.classList.add('light-theme'); localStorage.setItem('theme', 'light'); if (themeIcon) themeIcon.textContent = '☀️'; } }
+        const savedTheme = localStorage.getItem('theme'), themeIcon = document.querySelector('.theme-icon');
+        if (savedTheme === 'light') { document.body.classList.add('light-theme'); if (themeIcon) themeIcon.textContent = '☀️'; } else { if (themeIcon) themeIcon.textContent = '🌙'; }
+        initAuth();
+    </script>
 </body>
 </html>

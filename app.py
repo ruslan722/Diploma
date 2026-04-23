@@ -1770,8 +1770,12 @@ def categories_main_window():
     categories_container.pack(fill='both', expand=True)
     
     def load_categories():
+        # Полная очистка контейнера перед загрузкой
         for widget in categories_container.winfo_children():
             widget.destroy()
+        
+        # Принудительное обновление интерфейса
+        categories_container.update_idletasks()
         
         try:
             query = Category.select()
@@ -1880,8 +1884,6 @@ def categories_main_window():
                         hide_btn.pack(side='left', padx=2)
                         if quotes_count > 0:
                             hide_btn.configure(state="disabled")
-                            hide_btn.bind("<Enter>", lambda e: show_tooltip(e, "Сначала удалите все цитаты из категории"))
-                            hide_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                         
                         if is_main_admin():
                             delete_btn = create_samurai_button(
@@ -1894,8 +1896,6 @@ def categories_main_window():
                                 hover_color=SAMURAI_RED_HOVER
                             )
                             delete_btn.pack(side='left', padx=2)
-                            delete_btn.bind("<Enter>", lambda e: show_tooltip(e, "ПОЛНОСТЬЮ УДАЛИТЬ ИЗ БД"))
-                            delete_btn.bind("<Leave>", lambda e: hide_tooltip(e))
                     else:
                         restore_btn = create_samurai_button(
                             btn_frame,

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты поиска</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        let currentUser = {{ current_user | tojson | safe }};
+        let isAuthenticated = currentUser.is_authenticated;
+    </script>
+</head>
+<body>
+    <div class="toolbar-controls"><div class="toolbar-item"><button class="profile-toolbar-btn" id="profile-btn" title="Профиль">👤</button></div></div>
+    <div class="container">
+        <header class="main-header"><h1>Информационная система мотивационных высказываний</h1></header>
+        <div class="search-filter-wrapper">
+            <div class="search-container"><span class="search-icon">🔍</span><input type="text" id="global-search" class="search-input" placeholder="Поиск по всем цитатам..." value="{{ search_query }}"></div>
+            <div class="action-buttons"><button class="btn" onclick="performSearch()">Найти</button><button class="btn btn-secondary" onclick="clearSearch()">Сбросить</button></div>
+        </div>
+        <nav class="tabs-nav">
+            <a href="/" class="tab-item"><span class="tab-title">Главная</span></a>
+            <a href="/motivation" class="tab-item"><span class="tab-title">Мотивация</span></a>
+            <a href="/affirmation" class="tab-item"><span class="tab-title">Аффирмации</span></a>
+            <a href="/funny" class="tab-item"><span class="tab-title">Юмор</span></a>
+            <a href="/category" class="tab-item"><span class="tab-title">Категории</span></a>
+        </nav>
+        <main class="content-area">
+            <h1 class="page-title">Результаты поиска</h1>
+            <div class="results-info">По запросу <span class="results-count">"{{ search_query }}"</span> найдено: <span class="results-count">{{ total_results }}</span> результатов</div>
+            {% if total_results > 0 %}
+                {% if results.motivation %}
+                    <div class="search-results-section"><h2>🔥 Мотивационные цитаты ({{ results.motivation|length }})</h2><div id="quotes-container">{% for quote in results.motivation %}<div class="quote-card"><p class="quote-text">{{ quote.text|safe }}</p><p class="quote-author">{{ quote.author|safe if quote.author else 'Неизвестный автор' }}</p><p class="quote_type">{{ quote.type }}</p></div>{% endfor %}</div></div>
+                {% endif %}
+                {% if results.affirmation %}
+                    <div class="search-results-section"><h2>✨ Аффирмации ({{ results.affirmation|length }})</h2><div id="quotes-container">{% for quote in results.affirmation %}<div class="quote-card"><p class="quote-text">{{ quote.text|safe }}</p><p class="quote-author">{{ quote.author|safe if quote.author else 'Неизвестный автор' }}</p><p class="quote_type">{{ quote.type }}</p></div>{% endfor %}</div></div>
+                {% endif %}
+                {% if results.funny %}
+                    <div class="search-results-section"><h2>😄 Юмор ({{ results.funny|length }})</h2><div id="quotes-container">{% for quote in results.funny %}<div class="quote-card"><p class="quote-text">{{ quote.text|safe }}</p><p class="quote-author">{{ quote.author|safe if quote.author else 'Неизвестный автор' }}</p><p class="quote_type">{{ quote.type }}</p></div>{% endfor %}</div></div>
+                {% endif %}
+                {% if results.categories %}
+                    <div class="search-results-section"><h2>📂 Категории ({{ results.categories|length }})</h2><div id="quotes-container">{% for category in results.categories %}<div class="quote-card"><p class="name"><a href="/categoryquote?id={{ category.id }}" style="text-decoration: none; color: inherit;">{{ category.name|safe }}</a></p><p class="description">{{ category.description|safe if category.description else 'Нет описания' }}</p></div>{% endfor %}</div></div>
+                {% endif %}
+            {% else %}
+                <div class="no-results"><p>😔 Ничего не найдено</p><p>По запросу <span class="search-term">"{{ search_query }}"</span> нет результатов</p><p>Попробуйте изменить поисковый запрос</p></div>
+            {% endif %}
+        </main>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему"><span class="theme-icon">🌙</span></button>
+
+    <script>
+        const profileBtn = document.getElementById('profile-btn');
+        let authState = { isAuthenticated: false, username: '', nickname: '', avatar_path: null, stats: { likes: 0, dislikes: 0, total: 0 } };
+        let authMode = 'login', authModal = null, lampMode = 'off', rainbowInterval = null;
+
+        async function initAuth() { await checkAuthStatus(); updateProfileButton(); }
+        async function checkAuthStatus() { try { const response = await fetch('/api/auth/me'); if (response.ok) { const data = await response.json(); authState = data; isAuthenticated = data.is_authenticated; currentUser = data; updateProfileButton(); } } catch (error) { console.error('Ошибка проверки авторизации:', error); } }
+        function updateProfileButton() { if (!profileBtn) return; if (authState.is_authenticated && authState.avatar_path) { profileBtn.innerHTML = `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`; profileBtn.style.background = 'transparent'; } else if (authState.is_authenticated) { const initial = (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); profileBtn.innerHTML = initial; profileBtn.style.background = 'var(--accent-color)'; profileBtn.style.color = 'white'; profileBtn.style.fontWeight = 'bold'; } else { profileBtn.innerHTML = '👤'; profileBtn.style.background = ''; profileBtn.style.color = ''; } }
+        function createAuthModal() { const overlay = document.createElement('div'); overlay.className = 'auth-modal-overlay'; overlay.id = 'auth-modal-overlay'; const modal = document.createElement('div'); modal.className = 'auth-modal'; modal.id = 'auth-modal-window'; modal.innerHTML = `<button class="auth-modal-close" onclick="closeAuthModal()">✕</button><div id="auth-modal-content"></div>`; overlay.appendChild(modal); document.body.appendChild(overlay); overlay.addEventListener('click', function(e) { if (e.target === overlay) closeAuthModal(); }); return overlay; }
+        function openAuthModal() { if (!authModal) authModal = createAuthModal(); lampMode = 'off'; renderAuthModalContent(); authModal.classList.add('show'); }
+        function closeAuthModal() { if (authModal) { authModal.classList.remove('show'); stopRainbowAnimation(); const modalWindow = document.getElementById('auth-modal-window'); if (modalWindow) modalWindow.classList.remove('rainbow-theme'); lampMode = 'off'; } }
+        function stopRainbowAnimation() { if (rainbowInterval) { clearInterval(rainbowInterval); rainbowInterval = null; } }
+        function updateRainbowTheme() { const modalWindow = document.getElementById('auth-modal-window'); if (!modalWindow) return; if (lampMode === 'rainbow') modalWindow.classList.add('rainbow-theme'); else modalWindow.classList.remove('rainbow-theme'); }
+        function setFormEnabled(enabled) { const form = document.querySelector('#auth-modal-content form'); if (!form) return; const inputs = form.querySelectorAll('input'); const submitBtn = form.querySelector('button[type="submit"]'); inputs.forEach(input => { input.disabled = !enabled; input.style.opacity = enabled ? '1' : '0.5'; input.style.cursor = enabled ? 'text' : 'not-allowed'; }); if (submitBtn) { submitBtn.disabled = !enabled; submitBtn.style.opacity = enabled ? '1' : '0.5'; submitBtn.style.cursor = enabled ? 'pointer' : 'not-allowed'; } }
+        function toggleLamp() { const lamp = document.querySelector('.auth-lamp'); if (!lamp) return; if (lampMode === 'off') { lampMode = 'rainbow'; updateRainbowTheme(); setFormEnabled(false); } else if (lampMode === 'rainbow') { lampMode = 'on'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(true); } else { lampMode = 'off'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(false); } updateLampDisplay(); }
+        function updateLampDisplay() { const lamp = document.querySelector('.auth-lamp'); const statusText = document.querySelector('.lamp-status-text'); if (!lamp) return; lamp.className = 'auth-lamp ' + lampMode; if (statusText) { if (lampMode === 'off') statusText.textContent = '🔘 Нажми дважды для входа'; else if (lampMode === 'rainbow') statusText.textContent = '🌈 Радужный режим'; else if (lampMode === 'on') statusText.textContent = '✨ Готово к входу'; } }
+        function renderAuthModalContent() { const content = document.getElementById('auth-modal-content'); if (!content) return; if (authState.is_authenticated) renderProfileInModal(content); else renderAuthFormInModal(content); }
+        function renderProfileInModal(container) { const avatarContent = authState.avatar_path ? `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;object-fit:cover;">` : (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); container.innerHTML = `<div class="profile-modal-content"><div class="profile-modal-avatar">${avatarContent}</div><div class="profile-modal-username">${escapeHtml(authState.nickname || authState.username)}</div><div class="profile-modal-nickname">@${escapeHtml(authState.username)}</div><div class="profile-modal-stats"><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.likes || 0}</div><div class="profile-modal-stat-label">Лайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.dislikes || 0}</div><div class="profile-modal-stat-label">Дизлайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.total || 0}</div><div class="profile-modal-stat-label">Всего</div></div></div><div class="profile-modal-actions"><button class="auth-modal-btn" onclick="window.location.href='/profile'; closeAuthModal();">📋 Перейти в профиль</button><button class="auth-modal-btn" style="background: var(--danger-color);" onclick="handleLogout(); closeAuthModal();">🚪 Выйти</button></div></div>`; }
+        function renderAuthFormInModal(container) { const isLogin = authMode === 'login'; const isEnabled = lampMode === 'on'; container.innerHTML = `<div class="auth-lamp-container"><div class="auth-lamp ${lampMode}" onclick="toggleLamp()"><div class="lamp-glow"></div><div class="lamp-bulb"></div><div class="lamp-stem"></div><div class="lamp-base"></div></div><div class="lamp-status-text">${lampMode === 'off' ? '🔘 Нажми дважды для входа' : (lampMode === 'rainbow' ? '🌈 Радужный режим' : '✨ Готово к входу')}</div></div><div class="auth-welcome"><h2>${isLogin ? 'С возвращением' : 'Добро пожаловать'}</h2><p>${isLogin ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт'}</p></div><form onsubmit="handleModalAuthSubmit(event)"><div class="auth-input-group"><label class="auth-input-label">Имя пользователя</label><input type="text" name="username" class="auth-modal-input" placeholder="Введите имя пользователя" required minlength="3" autocomplete="username" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>${!isLogin ? `<div class="auth-input-group"><label class="auth-input-label">Отображаемое имя (необязательно)</label><input type="text" name="nickname" class="auth-modal-input" placeholder="Как вас называть?" autocomplete="nickname" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>` : ''}<div class="auth-input-group"><label class="auth-input-label">Пароль</label><input type="password" name="password" class="auth-modal-input" placeholder="Введите пароль" required minlength="4" autocomplete="${isLogin ? 'current-password' : 'new-password'}" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div><div id="modal-auth-message" class="auth-modal-message"></div><button type="submit" class="auth-modal-btn" id="modal-auth-submit" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>${isLogin ? 'Войти' : 'Зарегистрироваться'}</button></form><div class="auth-modal-links"><a class="auth-modal-link" onclick="switchModalAuthMode('${isLogin ? 'register' : 'login'}')">${isLogin ? 'Создать аккаунт' : 'Уже есть аккаунт?'}</a>${isLogin ? '<a class="auth-modal-link" onclick="showForgotPassword()">Забыли пароль?</a>' : ''}</div>`; }
+        function renderAuthForm() { const container = document.getElementById('auth-modal-content'); if (container) renderAuthFormInModal(container); }
+        function switchModalAuthMode(mode) { authMode = mode; const wasEnabled = lampMode === 'on'; renderAuthForm(); if (wasEnabled) { lampMode = 'on'; setTimeout(() => { setFormEnabled(true); updateLampDisplay(); updateRainbowTheme(); }, 10); } }
+        function showForgotPassword() { showNotification('Функция восстановления пароля в разработке', 'warning'); }
+        async function handleModalAuthSubmit(event) { event.preventDefault(); if (lampMode !== 'on') { showNotification('Включите лампу для авторизации! (Нажмите дважды)', 'warning'); return; } const form = event.target; const data = Object.fromEntries(new FormData(form).entries()); const messageDiv = document.getElementById('modal-auth-message'); const submitBtn = document.getElementById('modal-auth-submit'); messageDiv.innerHTML = ''; messageDiv.className = 'auth-modal-message'; submitBtn.disabled = true; submitBtn.textContent = 'Загрузка...'; try { const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register'; const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await response.json(); if (response.ok && result.success) { messageDiv.className = 'auth-modal-message success'; messageDiv.textContent = result.message; await checkAuthStatus(); showNotification(result.message, 'success'); setTimeout(() => { closeAuthModal(); updateProfileButton(); }, 1000); } else { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = result.message || 'Произошла ошибка'; showNotification(result.message || 'Произошла ошибка', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } } catch (error) { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = 'Ошибка соединения с сервером'; showNotification('Ошибка соединения с сервером', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } }
+        async function handleLogout() { await fetch('/api/auth/logout', { method: 'POST' }); authState = { isAuthenticated: false }; isAuthenticated = false; updateProfileButton(); showNotification('Вы вышли из системы', 'success'); }
+        function showNotification(message, type) { const notification = document.createElement('div'); notification.className = `notification notification-${type}`; notification.textContent = message; notification.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;background:${type==='success'?'#4caf50':type==='warning'?'#ff9800':'#f44336'};color:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);z-index:10000;animation:slideIn 0.3s ease;font-weight:bold;`; document.body.appendChild(notification); setTimeout(() => { notification.style.animation = 'slideOut 0.3s ease'; setTimeout(() => notification.remove(), 300); }, 3000); }
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        if (profileBtn) profileBtn.addEventListener('click', function(e) { e.stopPropagation(); openAuthModal(); });
+        function performSearch() { const searchQuery = document.getElementById('global-search').value.trim(); if (searchQuery) window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`; }
+        function clearSearch() { document.getElementById('global-search').value = ''; window.location.href = '/'; }
+        document.getElementById('global-search').addEventListener('keypress', function(e) { if (e.key === 'Enter') performSearch(); });
+        function toggleTheme() { const body = document.body, themeIcon = document.querySelector('.theme-icon'); if (body.classList.contains('light-theme')) { body.classList.remove('light-theme'); localStorage.setItem('theme', 'dark'); if (themeIcon) themeIcon.textContent = '🌙'; } else { body.classList.add('light-theme'); localStorage.setItem('theme', 'light'); if (themeIcon) themeIcon.textContent = '☀️'; } }
+        const savedTheme = localStorage.getItem('theme'), themeIcon = document.querySelector('.theme-icon');
+        if (savedTheme === 'light') { document.body.classList.add('light-theme'); if (themeIcon) themeIcon.textContent = '☀️'; } else { if (themeIcon) themeIcon.textContent = '🌙'; }
+        initAuth();
+    </script>
+</body>
+</html>

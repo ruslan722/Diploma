@@ -3,28 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>цитаты в категории</title>
-    <link rel="stylesheet" href="/static/categoryquote.css">    
-    <script src="/static/js/app.js"></script>
-
-    
-
+    <title>Цитаты в категории</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        let currentUser = {{ current_user | tojson | safe }};
+        let isAuthenticated = currentUser.is_authenticated;
+    </script>
 </head>
 <body>
+    <div class="toolbar-controls"><div class="toolbar-item"><button class="profile-toolbar-btn" id="profile-btn" title="Профиль">👤</button></div></div>
     <div class="container">
-        <h1>цитаты в категории</h1>
-        <div id="quotes-container">
-            {% for quote in category_quotes %}
-                <div class="quote-card">
-                    <p class="category_id">{{ quote.category_id }}</p>
-                    <p class="quote_type"> {{ quote.quote_type }}</p>
-                    <p class="quote_text"> {{ quote.quote_text }}</p>
-                    <p class="added_at"> {{ quote.added_at }}</p>
-                    <p class="quote_author"> {{ quote.quote_author }}</p>
+        <header class="main-header"><h1>Информационная система мотивационных высказываний</h1></header>
+        <nav class="tabs-nav">
+            <a href="/" class="tab-item"><span class="tab-title">Главная</span></a>
+            <a href="/motivation" class="tab-item"><span class="tab-title">Мотивация</span></a>
+            <a href="/affirmation" class="tab-item"><span class="tab-title">Аффирмации</span></a>
+            <a href="/funny" class="tab-item"><span class="tab-title">Юмор</span></a>
+            <a href="/category" class="tab-item active"><span class="tab-title">Категории</span></a>
+        </nav>
+        <main class="content-area">
+            <div class="page-header-row">
+                <h1 class="page-title">{% if category %}Категория: {{ category.name }}{% else %}Цитаты в категории{% endif %}</h1>
+                <div class="page-controls">
+                    <div class="control-item"><button class="control-btn" title="Поиск">🔍</button><div class="control-dropdown"><span class="dropdown-label">Поиск в категории</span><input type="text" id="search-input" class="input-mini" placeholder="Введите текст..." value="{{ search_query or '' }}" onkeypress="if(event.key === 'Enter') applyFilters()"></div></div>
+                    <div class="control-item"><button class="control-btn" title="Фильтр по типу">🏷️</button><div class="control-dropdown"><span class="dropdown-label">Тип цитаты</span><select id="type-filter" class="select-mini" onchange="applyFilters()"><option value="">Все типы</option>{% for type in quote_types %}<option value="{{ type }}" {% if quote_type_filter == type %}selected{% endif %}>{{ type }}</option>{% endfor %}</select></div></div>
+                    <div class="control-item"><button class="control-btn" title="Сортировка">⇅</button><div class="control-dropdown"><span class="dropdown-label">Сортировать по</span><select id="sort-select" class="select-mini" onchange="applyFilters()"><option value="default" {% if sort_by == 'default' %}selected{% endif %}>По умолчанию</option><option value="author_asc" {% if sort_by == 'author_asc' %}selected{% endif %}>Автор (А-Я)</option><option value="author_desc" {% if sort_by == 'author_desc' %}selected{% endif %}>Автор (Я-А)</option><option value="text_asc" {% if sort_by == 'text_asc' %}selected{% endif %}>Текст (А-Я)</option><option value="text_desc" {% if sort_by == 'text_desc' %}selected{% endif %}>Текст (Я-А)</option><option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Сначала новые</option><option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Сначала старые</option></select></div></div>
+                    <div class="control-item"><button class="control-btn btn-reset-icon" title="Сбросить все" onclick="clearFilters()">🔄</button></div>
                 </div>
-            {% endfor %}
-        </div>
+            </div>
+            {% if category and category.description %}<p class="category-description">{{ category.description }}</p>{% endif %}
+            {% if total_count %}<div class="results-info">Найдено: <span class="results-count">{{ category_quotes|length }}</span> из {{ total_count }} цитат</div>{% endif %}
+            <div id="quotes-container">
+                {% if category_quotes %}
+                    {% for quote in category_quotes %}
+                        <div class="quote-card">
+                            <p class="quote-text">{{ quote.quote_text|safe }}</p>
+                            {% if quote.quote_author %}<p class="quote-author">— {{ quote.quote_author|safe }}</p>{% endif %}
+                            <p class="quote_type">Тип: {{ quote.quote_type }}{% if quote.added_at %} | Добавлено: {{ quote.added_at.strftime('%d.%m.%Y') if quote.added_at else '' }}{% endif %}</p>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-results"><p>📝 В этой категории пока нет цитат</p>{% if search_query or quote_type_filter %}<p>Попробуйте изменить параметры поиска или фильтрации</p>{% if search_query %}<p>Поиск: <span class="search-term">"{{ search_query }}"</span></p>{% endif %}{% endif %}</div>
+                {% endif %}
+            </div>
+            <a href="/category" class="back-link">← Назад к категориям</a>
+        </main>
     </div>
-    
+    <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему"><span class="theme-icon">🌙</span></button>
+
+    <script>
+        const profileBtn = document.getElementById('profile-btn');
+        let authState = { isAuthenticated: false, username: '', nickname: '', avatar_path: null, stats: { likes: 0, dislikes: 0, total: 0 } };
+        let authMode = 'login', authModal = null, lampMode = 'off', rainbowInterval = null;
+
+        async function initAuth() { await checkAuthStatus(); updateProfileButton(); }
+        async function checkAuthStatus() { try { const response = await fetch('/api/auth/me'); if (response.ok) { const data = await response.json(); authState = data; isAuthenticated = data.is_authenticated; currentUser = data; updateProfileButton(); } } catch (error) { console.error('Ошибка проверки авторизации:', error); } }
+        function updateProfileButton() { if (!profileBtn) return; if (authState.is_authenticated && authState.avatar_path) { profileBtn.innerHTML = `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`; profileBtn.style.background = 'transparent'; } else if (authState.is_authenticated) { const initial = (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); profileBtn.innerHTML = initial; profileBtn.style.background = 'var(--accent-color)'; profileBtn.style.color = 'white'; profileBtn.style.fontWeight = 'bold'; } else { profileBtn.innerHTML = '👤'; profileBtn.style.background = ''; profileBtn.style.color = ''; } }
+        function createAuthModal() { const overlay = document.createElement('div'); overlay.className = 'auth-modal-overlay'; overlay.id = 'auth-modal-overlay'; const modal = document.createElement('div'); modal.className = 'auth-modal'; modal.id = 'auth-modal-window'; modal.innerHTML = `<button class="auth-modal-close" onclick="closeAuthModal()">✕</button><div id="auth-modal-content"></div>`; overlay.appendChild(modal); document.body.appendChild(overlay); overlay.addEventListener('click', function(e) { if (e.target === overlay) closeAuthModal(); }); return overlay; }
+        function openAuthModal() { if (!authModal) authModal = createAuthModal(); lampMode = 'off'; renderAuthModalContent(); authModal.classList.add('show'); }
+        function closeAuthModal() { if (authModal) { authModal.classList.remove('show'); stopRainbowAnimation(); const modalWindow = document.getElementById('auth-modal-window'); if (modalWindow) modalWindow.classList.remove('rainbow-theme'); lampMode = 'off'; } }
+        function stopRainbowAnimation() { if (rainbowInterval) { clearInterval(rainbowInterval); rainbowInterval = null; } }
+        function updateRainbowTheme() { const modalWindow = document.getElementById('auth-modal-window'); if (!modalWindow) return; if (lampMode === 'rainbow') modalWindow.classList.add('rainbow-theme'); else modalWindow.classList.remove('rainbow-theme'); }
+        function setFormEnabled(enabled) { const form = document.querySelector('#auth-modal-content form'); if (!form) return; const inputs = form.querySelectorAll('input'); const submitBtn = form.querySelector('button[type="submit"]'); inputs.forEach(input => { input.disabled = !enabled; input.style.opacity = enabled ? '1' : '0.5'; input.style.cursor = enabled ? 'text' : 'not-allowed'; }); if (submitBtn) { submitBtn.disabled = !enabled; submitBtn.style.opacity = enabled ? '1' : '0.5'; submitBtn.style.cursor = enabled ? 'pointer' : 'not-allowed'; } }
+        function toggleLamp() { const lamp = document.querySelector('.auth-lamp'); if (!lamp) return; if (lampMode === 'off') { lampMode = 'rainbow'; updateRainbowTheme(); setFormEnabled(false); } else if (lampMode === 'rainbow') { lampMode = 'on'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(true); } else { lampMode = 'off'; stopRainbowAnimation(); updateRainbowTheme(); setFormEnabled(false); } updateLampDisplay(); }
+        function updateLampDisplay() { const lamp = document.querySelector('.auth-lamp'); const statusText = document.querySelector('.lamp-status-text'); if (!lamp) return; lamp.className = 'auth-lamp ' + lampMode; if (statusText) { if (lampMode === 'off') statusText.textContent = '🔘 Нажми дважды для входа'; else if (lampMode === 'rainbow') statusText.textContent = '🌈 Радужный режим'; else if (lampMode === 'on') statusText.textContent = '✨ Готово к входу'; } }
+        function renderAuthModalContent() { const content = document.getElementById('auth-modal-content'); if (!content) return; if (authState.is_authenticated) renderProfileInModal(content); else renderAuthFormInModal(content); }
+        function renderProfileInModal(container) { const avatarContent = authState.avatar_path ? `<img src="${authState.avatar_path}" alt="аватар" style="width:100%;height:100%;object-fit:cover;">` : (authState.nickname || authState.username || '?').charAt(0).toUpperCase(); container.innerHTML = `<div class="profile-modal-content"><div class="profile-modal-avatar">${avatarContent}</div><div class="profile-modal-username">${escapeHtml(authState.nickname || authState.username)}</div><div class="profile-modal-nickname">@${escapeHtml(authState.username)}</div><div class="profile-modal-stats"><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.likes || 0}</div><div class="profile-modal-stat-label">Лайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.dislikes || 0}</div><div class="profile-modal-stat-label">Дизлайков</div></div><div class="profile-modal-stat"><div class="profile-modal-stat-value">${authState.stats?.total || 0}</div><div class="profile-modal-stat-label">Всего</div></div></div><div class="profile-modal-actions"><button class="auth-modal-btn" onclick="window.location.href='/profile'; closeAuthModal();">📋 Перейти в профиль</button><button class="auth-modal-btn" style="background: var(--danger-color);" onclick="handleLogout(); closeAuthModal();">🚪 Выйти</button></div></div>`; }
+        function renderAuthFormInModal(container) { const isLogin = authMode === 'login'; const isEnabled = lampMode === 'on'; container.innerHTML = `<div class="auth-lamp-container"><div class="auth-lamp ${lampMode}" onclick="toggleLamp()"><div class="lamp-glow"></div><div class="lamp-bulb"></div><div class="lamp-stem"></div><div class="lamp-base"></div></div><div class="lamp-status-text">${lampMode === 'off' ? '🔘 Нажми дважды для входа' : (lampMode === 'rainbow' ? '🌈 Радужный режим' : '✨ Готово к входу')}</div></div><div class="auth-welcome"><h2>${isLogin ? 'С возвращением' : 'Добро пожаловать'}</h2><p>${isLogin ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт'}</p></div><form onsubmit="handleModalAuthSubmit(event)"><div class="auth-input-group"><label class="auth-input-label">Имя пользователя</label><input type="text" name="username" class="auth-modal-input" placeholder="Введите имя пользователя" required minlength="3" autocomplete="username" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>${!isLogin ? `<div class="auth-input-group"><label class="auth-input-label">Отображаемое имя (необязательно)</label><input type="text" name="nickname" class="auth-modal-input" placeholder="Как вас называть?" autocomplete="nickname" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div>` : ''}<div class="auth-input-group"><label class="auth-input-label">Пароль</label><input type="password" name="password" class="auth-modal-input" placeholder="Введите пароль" required minlength="4" autocomplete="${isLogin ? 'current-password' : 'new-password'}" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}></div><div id="modal-auth-message" class="auth-modal-message"></div><button type="submit" class="auth-modal-btn" id="modal-auth-submit" ${!isEnabled ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>${isLogin ? 'Войти' : 'Зарегистрироваться'}</button></form><div class="auth-modal-links"><a class="auth-modal-link" onclick="switchModalAuthMode('${isLogin ? 'register' : 'login'}')">${isLogin ? 'Создать аккаунт' : 'Уже есть аккаунт?'}</a>${isLogin ? '<a class="auth-modal-link" onclick="showForgotPassword()">Забыли пароль?</a>' : ''}</div>`; }
+        function renderAuthForm() { const container = document.getElementById('auth-modal-content'); if (container) renderAuthFormInModal(container); }
+        function switchModalAuthMode(mode) { authMode = mode; const wasEnabled = lampMode === 'on'; renderAuthForm(); if (wasEnabled) { lampMode = 'on'; setTimeout(() => { setFormEnabled(true); updateLampDisplay(); updateRainbowTheme(); }, 10); } }
+        function showForgotPassword() { showNotification('Функция восстановления пароля в разработке', 'warning'); }
+        async function handleModalAuthSubmit(event) { event.preventDefault(); if (lampMode !== 'on') { showNotification('Включите лампу для авторизации! (Нажмите дважды)', 'warning'); return; } const form = event.target; const data = Object.fromEntries(new FormData(form).entries()); const messageDiv = document.getElementById('modal-auth-message'); const submitBtn = document.getElementById('modal-auth-submit'); messageDiv.innerHTML = ''; messageDiv.className = 'auth-modal-message'; submitBtn.disabled = true; submitBtn.textContent = 'Загрузка...'; try { const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register'; const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await response.json(); if (response.ok && result.success) { messageDiv.className = 'auth-modal-message success'; messageDiv.textContent = result.message; await checkAuthStatus(); showNotification(result.message, 'success'); setTimeout(() => { closeAuthModal(); updateProfileButton(); }, 1000); } else { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = result.message || 'Произошла ошибка'; showNotification(result.message || 'Произошла ошибка', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } } catch (error) { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = 'Ошибка соединения с сервером'; showNotification('Ошибка соединения с сервером', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } }
+        async function handleLogout() { await fetch('/api/auth/logout', { method: 'POST' }); authState = { isAuthenticated: false }; isAuthenticated = false; updateProfileButton(); showNotification('Вы вышли из системы', 'success'); }
+        function showNotification(message, type) { const notification = document.createElement('div'); notification.className = `notification notification-${type}`; notification.textContent = message; notification.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;background:${type==='success'?'#4caf50':type==='warning'?'#ff9800':'#f44336'};color:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);z-index:10000;animation:slideIn 0.3s ease;font-weight:bold;`; document.body.appendChild(notification); setTimeout(() => { notification.style.animation = 'slideOut 0.3s ease'; setTimeout(() => notification.remove(), 300); }, 3000); }
+        function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+        if (profileBtn) profileBtn.addEventListener('click', function(e) { e.stopPropagation(); openAuthModal(); });
+        function applyFilters() { const searchQuery = document.getElementById('search-input').value.trim(); const quoteType = document.getElementById('type-filter').value; const sortBy = document.getElementById('sort-select').value; const urlParams = new URLSearchParams(window.location.search); const categoryId = urlParams.get('id'); let url = `/categoryquote?id=${categoryId}`; const params = []; if (searchQuery) params.push(`search=${encodeURIComponent(searchQuery)}`); if (quoteType) params.push(`quote_type=${encodeURIComponent(quoteType)}`); if (sortBy && sortBy !== 'default') params.push(`sort=${encodeURIComponent(sortBy)}`); if (params.length > 0) url += '&' + params.join('&'); window.location.href = url; }
+        function clearFilters() { const urlParams = new URLSearchParams(window.location.search); const categoryId = urlParams.get('id'); window.location.href = `/categoryquote?id=${categoryId}`; }
+        document.querySelectorAll('.control-btn').forEach(btn => { btn.addEventListener('click', function(e) { e.stopPropagation(); const currentDropdown = this.parentElement.querySelector('.control-dropdown'); document.querySelectorAll('.control-dropdown').forEach(dd => { if (dd !== currentDropdown) dd.classList.remove('show'); }); currentDropdown.classList.toggle('show'); }); });
+        document.addEventListener('click', () => document.querySelectorAll('.control-dropdown').forEach(dd => dd.classList.remove('show')));
+        document.querySelectorAll('.control-dropdown').forEach(dd => dd.addEventListener('click', e => e.stopPropagation()));
+        function toggleTheme() { const body = document.body, themeIcon = document.querySelector('.theme-icon'); if (body.classList.contains('light-theme')) { body.classList.remove('light-theme'); localStorage.setItem('theme', 'dark'); if (themeIcon) themeIcon.textContent = '🌙'; } else { body.classList.add('light-theme'); localStorage.setItem('theme', 'light'); if (themeIcon) themeIcon.textContent = '☀️'; } }
+        const savedTheme = localStorage.getItem('theme'), themeIcon = document.querySelector('.theme-icon');
+        if (savedTheme === 'light') { document.body.classList.add('light-theme'); if (themeIcon) themeIcon.textContent = '☀️'; } else { if (themeIcon) themeIcon.textContent = '🌙'; }
+        initAuth();
+    </script>
 </body>
 </html>

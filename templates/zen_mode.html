@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Режим тишины — {{ type_name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Специфичные стили для Zen режима, похожие на Tkinter */
+        body {
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
+            font-family: 'Georgia', 'Segoe UI', serif;
+        }
+        
+        /* Контейнер как в Tkinter - тёмный фон с золотой рамкой */
+        .zen-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 40px;
+            position: relative;
+            background: #0d0d0d;
+        }
+        
+        /* Карточка цитаты как в Tkinter - тёмная панель с золотой рамкой */
+        .zen-quote-card {
+            background: #1a1a1a;
+            border: 2px solid #D4AF37;
+            border-radius: 0px;
+            padding: 60px 80px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+        
+        /* Текст цитаты - крупный, курсив, по центру */
+        .zen-quote-text {
+            font-size: 2.2rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            font-style: italic;
+            font-weight: 400;
+            text-align: center;
+            color: #E8E8E8;
+            font-family: 'Georgia', serif;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Автор - золотой, по центру */
+        .zen-quote-author {
+            font-size: 1.3rem;
+            color: #D4AF37;
+            text-align: center;
+            letter-spacing: 1px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        
+        .zen-quote-author::before {
+            content: "— ";
+        }
+        
+        /* Кнопка выхода - как в Tkinter */
+        .exit-zen {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: #8B0000;
+            border: 1px solid #D4AF37;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 100;
+            text-decoration: none;
+            font-family: monospace;
+        }
+        
+        .exit-zen:hover {
+            background: #5e0000;
+            transform: scale(1.05);
+        }
+        
+        /* Кнопка случайной цитаты */
+        .random-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: #1a1a1a;
+            border: 1px solid #D4AF37;
+            color: #D4AF37;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        .random-btn:hover {
+            background: #D4AF37;
+            color: #1a1a1a;
+            transform: scale(1.05) rotate(15deg);
+        }
+        
+        /* Навигационные кнопки как в Tkinter */
+        .zen-nav {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-top: 40px;
+        }
+        
+        .zen-nav-btn {
+            width: 60px;
+            height: 60px;
+            background: #262626;
+            border: 1px solid #D4AF37;
+            color: #D4AF37;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .zen-nav-btn:hover {
+            background: #D4AF37;
+            color: #1a1a1a;
+            transform: scale(1.05);
+        }
+        
+        /* Счётчик */
+        .zen-counter {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #A0A0A0;
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            font-family: 'Segoe UI', monospace;
+        }
+        
+        /* Кнопки реакций в Zen режиме - как в Tkinter */
+        .zen-reactions {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+        }
+        
+        .btn-reaction {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 30px;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        
+        .btn-reaction.like {
+            background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }
+        
+        .btn-reaction.like:hover {
+            background: linear-gradient(135deg, #1b5e20 0%, #388e3c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+        
+        .btn-reaction.dislike {
+            background: linear-gradient(135deg, #c62828 0%, #f44336 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+        }
+        
+        .btn-reaction.dislike:hover {
+            background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.6);
+        }
+        
+        .btn-reaction .icon {
+            font-size: 22px;
+        }
+        
+        .btn-reaction .count {
+            font-weight: bold;
+        }
+        
+        /* Анимация смены цитаты */
+        @keyframes zenFadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+        
+        @keyframes zenFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .quote-animate-out {
+            animation: zenFadeOut 0.2s ease forwards;
+        }
+        
+        .quote-animate-in {
+            animation: zenFadeIn 0.2s ease forwards;
+        }
+        
+        /* Пульсация для реакций */
+        .reaction-pulse {
+            animation: zenPulse 0.5s ease;
+        }
+        
+        @keyframes zenPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .zen-quote-card {
+                padding: 30px 40px;
+            }
+            
+            .zen-quote-text {
+                font-size: 1.5rem;
+            }
+            
+            .zen-quote-author {
+                font-size: 1rem;
+            }
+            
+            .zen-nav {
+                gap: 20px;
+            }
+            
+            .zen-nav-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 22px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .zen-quote-card {
+                padding: 20px 25px;
+            }
+            
+            .zen-quote-text {
+                font-size: 1.2rem;
+            }
+            
+            .zen-reactions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn-reaction {
+                width: 200px;
+                justify-content: center;
+            }
+            
+            .exit-zen, .random-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="zen-container">
+        <a href="/{{ quote_type }}" class="exit-zen" title="Выйти из режима тишины">✕</a>
+        <button class="random-btn" onclick="showRandomQuote()" title="Случайная цитата">🎲</button>
+        
+        <div class="zen-quote-card" id="quoteContainer">
+            <div class="zen-quote-text" id="quoteText"></div>
+            <div class="zen-quote-author" id="quoteAuthor"></div>
+            
+            <div class="zen-reactions">
+                <button class="btn-reaction like" onclick="sendReaction('like')">
+                    <span class="icon">👍</span>
+                    <span class="count" id="like-count">0</span>
+                </button>
+                <button class="btn-reaction dislike" onclick="sendReaction('dislike')">
+                    <span class="icon">👎</span>
+                    <span class="count" id="dislike-count">0</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="zen-nav">
+            <button class="zen-nav-btn" onclick="prevQuote()">◀</button>
+            <button class="zen-nav-btn" onclick="nextQuote()">▶</button>
+        </div>
+        
+        <div class="zen-counter" id="counter">—</div>
+    </div>
+
+    <script>
+        // Данные цитат из сервера
+        const quotesData = {{ all_quotes | tojson | safe }};
+        let currentIndex = 0;
+        let currentQuoteId = null;
+        let currentQuoteType = "{{ quote_type }}";
+        let isAnimating = false;
+        
+        // Инициализация
+        function init() {
+            {% if selected_quote %}
+                // Если выбрана конкретная цитата
+                const foundIndex = quotesData.findIndex(q => q.id == {{ selected_quote.id }});
+                if (foundIndex !== -1) {
+                    currentIndex = foundIndex;
+                }
+            {% endif %}
+            
+            if (quotesData.length > 0) {
+                updateDisplay();
+            } else {
+                document.getElementById('quoteText').textContent = "Нет цитат в этой категории";
+                document.getElementById('quoteAuthor').textContent = "";
+            }
+        }
+        
+        // Обновление отображения
+        function updateDisplay(direction = null) {
+            if (quotesData.length === 0) return;
+            
+            const quote = quotesData[currentIndex];
+            currentQuoteId = quote.id;
+            
+            const quoteText = document.getElementById('quoteText');
+            const quoteAuthor = document.getElementById('quoteAuthor');
+            const quoteCard = document.getElementById('quoteContainer');
+            
+            if (direction) {
+                // Анимация исчезновения
+                quoteCard.classList.add('quote-animate-out');
+                setTimeout(() => {
+                    quoteText.textContent = `"${quote.text}"`;
+                    quoteAuthor.textContent = quote.author ? `${quote.author}` : '';
+                    quoteCard.classList.remove('quote-animate-out');
+                    quoteCard.classList.add('quote-animate-in');
+                    setTimeout(() => {
+                        quoteCard.classList.remove('quote-animate-in');
+                    }, 200);
+                }, 150);
+            } else {
+                quoteText.textContent = `"${quote.text}"`;
+                quoteAuthor.textContent = quote.author ? `${quote.author}` : '';
+            }
+            
+            document.getElementById('counter').textContent = `${currentIndex + 1} / ${quotesData.length}`;
+            
+            loadReactionsCount();
+        }
+        
+        // Следующая цитата
+        function nextQuote() {
+            if (isAnimating || quotesData.length === 0) return;
+            isAnimating = true;
+            currentIndex = (currentIndex + 1) % quotesData.length;
+            updateDisplay('next');
+            setTimeout(() => { isAnimating = false; }, 400);
+        }
+        
+        // Предыдущая цитата
+        function prevQuote() {
+            if (isAnimating || quotesData.length === 0) return;
+            isAnimating = true;
+            currentIndex = (currentIndex - 1 + quotesData.length) % quotesData.length;
+            updateDisplay('prev');
+            setTimeout(() => { isAnimating = false; }, 400);
+        }
+        
+        // Случайная цитата
+        function showRandomQuote() {
+            if (isAnimating || quotesData.length === 0) return;
+            isAnimating = true;
+            
+            let newIndex;
+            do {
+                newIndex = Math.floor(Math.random() * quotesData.length);
+            } while (newIndex === currentIndex && quotesData.length > 1);
+            
+            currentIndex = newIndex;
+            updateDisplay('random');
+            setTimeout(() => { isAnimating = false; }, 400);
+            
+            // Добавляем эффект на кнопку
+            const btn = document.querySelector('.random-btn');
+            btn.style.transform = 'scale(0.9) rotate(15deg)';
+            setTimeout(() => {
+                btn.style.transform = '';
+            }, 200);
+        }
+        
+        // Отправка реакции
+        async function sendReaction(reactionType) {
+            if (!currentQuoteId) return;
+            
+            const btn = document.querySelector(`.btn-reaction.${reactionType}`);
+            btn.style.transform = 'scale(0.95)';
+            
+            try {
+                const response = await fetch('/api/reaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        quote_id: currentQuoteId,
+                        quote_type: currentQuoteType,
+                        reaction: reactionType
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateReactionCounts(data.likes_count, data.dislikes_count);
+                    
+                    // Эффект пульсации
+                    btn.classList.add('reaction-pulse');
+                    setTimeout(() => {
+                        btn.classList.remove('reaction-pulse');
+                    }, 500);
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+            
+            setTimeout(() => {
+                btn.style.transform = '';
+            }, 150);
+        }
+        
+        // Загрузка количества реакций
+        async function loadReactionsCount() {
+            if (!currentQuoteId) return;
+            
+            try {
+                const response = await fetch(`/api/reactions/count?quote_id=${currentQuoteId}&quote_type=${currentQuoteType}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateReactionCounts(data.likes, data.dislikes);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки реакций:', error);
+            }
+        }
+        
+        // Обновление счётчиков
+        function updateReactionCounts(likes, dislikes) {
+            const likeCount = document.getElementById('like-count');
+            const dislikeCount = document.getElementById('dislike-count');
+            
+            if (likeCount) likeCount.textContent = likes || 0;
+            if (dislikeCount) dislikeCount.textContent = dislikes || 0;
+        }
+        
+        // Обработка клавиш (как в Tkinter)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') {
+                prevQuote();
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                nextQuote();
+                e.preventDefault();
+            } else if (e.key === ' ' || e.key === 'Space' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                showRandomQuote();
+                e.preventDefault();
+            } else if (e.key === 'Escape') {
+                window.location.href = '/{{ quote_type }}';
+                e.preventDefault();
+            }
+        });
+        
+        // Запуск
+        init();
+    </script>
+</body>
+</html>

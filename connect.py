@@ -53,6 +53,7 @@ class UserReaction(BaseModel):
     quote_id = IntegerField()
     quote_type = CharField() # 'motivation', 'affirmation', 'funny'
     reaction = CharField()   # 'like' или 'dislike'
+    created_at = DateTimeField(default=datetime.datetime.now)  # Добавлено поле даты
 
     class Meta:
         indexes = (
@@ -62,8 +63,8 @@ class UserReaction(BaseModel):
 
 class UserProfile(BaseModel):
     username = CharField(unique=True)
-    nickname = CharField(default='')  
-    avatar_path = CharField(default='')  
+    nickname = CharField(default='')
+    avatar_path = CharField(default='', null=True)  # Добавлено null=True
     created_at = DateTimeField(default=datetime.datetime.now)
 
 class AdminActionLog(BaseModel):
@@ -90,7 +91,7 @@ class CategoryQuote(BaseModel):
     """Связь цитаты с категорией"""
     category = ForeignKeyField(Category, backref='quotes', on_delete='CASCADE')
     quote_type = CharField(max_length=20)  # 'motivation', 'affirmation', 'funny'
-    quote_text = CharField()  # Текст цитаты
+    quote_text = TextField()  # Текст цитаты (изменено на TextField)
     quote_author = CharField(max_length=200)  # Автор цитаты
     added_at = DateTimeField(default=datetime.datetime.now)  # Дата добавления
     
@@ -133,9 +134,20 @@ def init_db():
             migrate(migrator.add_column('categories', 'is_deleted', BooleanField(default=False)))
         except: pass
         
+        # Добавляем created_at в UserReaction, если его нет
+        try:
+            migrate(migrator.add_column('userreaction', 'created_at', DateTimeField(default=datetime.datetime.now)))
+        except: pass
         
+        # Добавляем added_at в CategoryQuote, если его нет
         try:
             migrate(migrator.add_column('category_quotes', 'added_at', DateTimeField(default=datetime.datetime.now)))
+        except: pass
+        
+        # Изменяем quote_text на TextField если нужно
+        try:
+            # Сначала пробуем добавить колонку если её нет
+            migrate(migrator.add_column('category_quotes', 'quote_text_new', TextField(null=True)))
         except: pass
             
     except Exception as e:
@@ -155,6 +167,15 @@ def init_db():
             role='администратор',
             is_main_admin=True
         )
+        # Создаем профиль для админа
+        try:
+            UserProfile.get(UserProfile.username == "admin")
+        except UserProfile.DoesNotExist:
+            UserProfile.create(
+                username="admin",
+                nickname="Администратор",
+                avatar_path=None
+            )
     
     db.close()
 
