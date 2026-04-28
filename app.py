@@ -10,12 +10,13 @@ import json
 import logging
 import random
 import string
+import math
 from datetime import datetime
 
 from connect import (
     Avtorization, Motivation, Affirmation, FunnyQuote,
     AdminRequests, UserReaction, UserProfile, AdminActionLog, init_db,
-    Category, CategoryQuote
+    Category, CategoryQuote, QuoteRating, UserQuoteRating
 )
 
 
@@ -991,6 +992,243 @@ def show_profile_settings():
                          color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
 
 
+# ========== КЛАСС ДЛЯ РЕЙТИНГА ==========
+
+class RatingManager:
+    """Менеджер для работы с рейтингами цитат"""
+    
+    def __init__(self, username):
+        self.username = username
+    
+    def get_quote_rating(self, quote_id, quote_type):
+        """Получить средний рейтинг цитаты"""
+        try:
+            rating = QuoteRating.get_or_none(
+                (QuoteRating.quote_id == quote_id) &
+                (QuoteRating.quote_type == quote_type)
+            )
+            if rating:
+                return {
+                    'average': rating.average_rating,
+                    'votes': rating.votes_count,
+                    'total': rating.total_rating
+                }
+            return {'average': 0, 'votes': 0, 'total': 0}
+        except Exception as e:
+            logger.error(f"Ошибка получения рейтинга: {e}")
+            return {'average': 0, 'votes': 0, 'total': 0}
+    
+    def get_top_rated_quotes(self, quote_type=None, limit=10, min_votes=1):
+        """Получить топ цитат по рейтингу"""
+        try:
+            query = QuoteRating.select().where(
+                QuoteRating.votes_count >= min_votes
+            ).order_by(QuoteRating.average_rating.desc()).limit(limit)
+            
+            if quote_type:
+                query = query.where(QuoteRating.quote_type == quote_type)
+            
+            results = []
+            models = {
+                'motivation': Motivation,
+                'affirmation': Affirmation,
+                'funny': FunnyQuote
+            }
+            
+            for rating in query:
+                model = models.get(rating.quote_type)
+                if model:
+                    try:
+                        quote = model.get_by_id(rating.quote_id)
+                        if not quote.is_deleted:
+                            results.append({
+                                'id': quote.id,
+                                'type': rating.quote_type,
+                                'text': quote.text,
+                                'author': quote.author,
+                                'rating': rating.average_rating,
+                                'votes': rating.votes_count
+                            })
+                    except:
+                        pass
+            return results
+        except Exception as e:
+            logger.error(f"Ошибка получения топа: {e}")
+            return []
+
+
+# ========== ВИДЖЕТ ДЛЯ ОТОБРАЖЕНИЯ РЕЙТИНГА С ЧАСТИЧНЫМ ЗАПОЛНЕНИЕМ ЗВЕЗД ==========
+
+class RatingDisplayWidget(ctk.CTkFrame):
+    """Виджет для отображения рейтинга звездами с частичным заполнением (как на HDRezka)"""
+    
+    def __init__(self, parent, rating_info, **kwargs):
+        super().__init__(parent, fg_color="transparent", **kwargs)
+        self.rating_info = rating_info
+        self.setup_ui()
+    
+    def setup_ui(self):
+        avg = self.rating_info.get('average', 0)
+        votes = self.rating_info.get('votes', 0)
+        
+        # Отображаем звезды с частичным заполнением
+        stars_frame = ctk.CTkFrame(self, fg_color="transparent")
+        stars_frame.pack(side='left', padx=5)
+        
+        # Создаем 5 звезд с частичным заполнением
+        star_size = 20
+        star_padding = 2
+        
+        for i in range(5):
+            star_number = i + 1
+            
+            # Вычисляем процент заполнения для текущей звезды (0.0 до 1.0)
+            if avg >= star_number:
+                fill_percent = 1.0  # Полностью заполнена
+            elif avg > star_number - 1:
+                fill_percent = avg - (star_number - 1)  # Частично заполнена
+            else:
+                fill_percent = 0.0  # Пустая
+            
+            # Создаем canvas для одной звезды
+            star_canvas = tk.Canvas(
+                stars_frame, 
+                width=star_size + star_padding * 2, 
+                height=star_size + star_padding * 2, 
+                bg=SAMURAI_BG, 
+                highlightthickness=0
+            )
+            star_canvas.pack(side='left', padx=0)
+            
+            # Рисуем звезду с частичным заполнением
+            self.draw_partial_star(star_canvas, star_size, star_padding, fill_percent)
+        
+        # Числовое значение и количество голосов
+        info_frame = ctk.CTkFrame(self, fg_color="transparent")
+        info_frame.pack(side='left', padx=10)
+        
+        if votes > 0:
+            rating_text = f"{avg:.1f} ({votes} голосов)"
+            rating_color = SAMURAI_GOLD
+        else:
+            rating_text = "Нет оценок"
+            rating_color = SAMURAI_TEXT_SECONDARY
+        
+        ctk.CTkLabel(
+            info_frame, 
+            text=rating_text, 
+            font=FONT_PRIMARY, 
+            text_color=rating_color
+        ).pack(side='left')
+    
+    def draw_partial_star(self, canvas, size, padding, fill_percent):
+        """Рисует звезду с частичным заполнением"""
+        cx = size / 2 + padding
+        cy = size / 2 + padding
+        r = size / 2 - 1
+        
+        # Вычисляем точки звезды
+        points = []
+        for i in range(10):
+            angle = math.pi / 2 - i * math.pi / 5
+            if i % 2 == 0:
+                radius = r
+            else:
+                radius = r * 0.4
+            
+            x = cx + radius * math.cos(angle)
+            y = cy - radius * math.sin(angle)
+            points.extend([x, y])
+        
+        # Рисуем контур звезды (пустая звезда)
+        canvas.create_polygon(points, fill=SAMURAI_BG, outline=SAMURAI_TEXT_SECONDARY, width=1)
+        
+        if fill_percent > 0:
+            # Создаем маску для частичного заполнения
+            clip_width = int((size + padding * 2) * fill_percent)
+            
+            # Рисуем заполненную часть звезды золотым цветом
+            if fill_percent >= 1.0:
+                # Полностью заполненная звезда
+                canvas.create_polygon(points, fill=SAMURAI_GOLD, outline=SAMURAI_GOLD)
+            else:
+                # Частично заполненная звезда
+                # Сначала рисуем золотую звезду
+                star_id = canvas.create_polygon(points, fill=SAMURAI_GOLD, outline=SAMURAI_GOLD)
+                
+                # Затем рисуем прямоугольник фона, который обрезает звезду справа
+                clip_id = canvas.create_rectangle(
+                    clip_width, 0, 
+                    size + padding * 2 + 10, size + padding * 2 + 10,
+                    fill=SAMURAI_BG, outline=''
+                )
+                
+                # Поднимаем обрезающий прямоугольник над звездой
+                canvas.tag_raise(clip_id, star_id)
+
+
+# ========== ФУНКЦИИ ДЛЯ ОТОБРАЖЕНИЯ ТОПА ==========
+
+def show_top_quotes_window(rating_manager, quote_filter=None):
+    """Показать окно с топ-цитатами"""
+    top_win = ctk.CTkToplevel(root)
+    top_win.title("🏆 Топ цитат")
+    top_win.geometry("800x600")
+    top_win.configure(fg_color=SAMURAI_BG)
+    top_win.transient(root)
+    top_win.grab_set()
+    
+    set_fullscreen(top_win)
+    
+    main_frame = create_samurai_frame(top_win, fg_color=SAMURAI_BG)
+    main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+    
+    create_samurai_label(main_frame, "🏆 Топ цитат по рейтингу", font=FONT_TITLE, text_color=SAMURAI_GOLD).pack(pady=10)
+    
+    scroll_frame = ctk.CTkScrollableFrame(main_frame, fg_color=SAMURAI_BG)
+    scroll_frame.pack(fill='both', expand=True, padx=10, pady=10)
+    
+    type_labels = {'motivation': '💪 Мотивация', 'affirmation': '🌸 Аффирмация', 'funny': '😄 Юмор'}
+    types_to_show = [quote_filter] if quote_filter else ['motivation', 'affirmation', 'funny']
+    
+    for quote_type in types_to_show:
+        top_quotes = rating_manager.get_top_rated_quotes(quote_type, limit=20, min_votes=1)
+        
+        type_frame = create_samurai_frame(scroll_frame, border_color=SAMURAI_GOLD)
+        type_frame.pack(fill='x', pady=10)
+        
+        create_samurai_label(type_frame, type_labels.get(quote_type, quote_type), 
+                            font=FONT_HEADER, text_color=SAMURAI_GOLD).pack(anchor='w', padx=10, pady=5)
+        
+        if top_quotes:
+            for i, q in enumerate(top_quotes, 1):
+                quote_frame = create_samurai_frame(type_frame, fg_color=SAMURAI_PANEL)
+                quote_frame.pack(fill='x', padx=10, pady=5)
+                
+                header_frame = ctk.CTkFrame(quote_frame, fg_color="transparent")
+                header_frame.pack(fill='x')
+                
+                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+                create_samurai_label(header_frame, f"{medal}", font=FONT_BOLD, 
+                                    text_color=SAMURAI_GOLD).pack(side='left', padx=5)
+                
+                RatingDisplayWidget(header_frame, {'average': q['rating'], 'votes': q['votes']}).pack(side='left', padx=10)
+                
+                text_preview = q['text'][:100] + "..." if len(q['text']) > 100 else q['text']
+                create_samurai_label(quote_frame, f"«{text_preview}»",
+                                    font=('Georgia', 11, 'italic'), text_color=SAMURAI_TEXT, 
+                                    wraplength=700, justify='left').pack(anchor='w', padx=10, pady=5)
+                
+                if q['author']:
+                    create_samurai_label(quote_frame, f"— {q['author']}", 
+                                        font=('Segoe UI', 10), text_color=SAMURAI_TEXT_SECONDARY).pack(anchor='w', padx=10, pady=(0, 5))
+        else:
+            create_samurai_label(type_frame, "Нет оцененных цитат", 
+                                text_color=SAMURAI_TEXT_SECONDARY).pack(pady=10)
+    
+    create_samurai_button(main_frame, "Закрыть", top_win.destroy).pack(pady=10)
+
+
 def home_window():
     if not check_auth():
         return
@@ -1157,6 +1395,23 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
     content_frame = ctk.CTkFrame(root, fg_color=SAMURAI_BG)
     content_frame.pack(fill='both', expand=True)
     
+    # Кнопка для просмотра топа
+    top_btn_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+    top_btn_frame.pack(fill='x', padx=20, pady=10)
+    
+    def show_top():
+        rating_manager = RatingManager(current_user['username'])
+        show_top_quotes_window(rating_manager, quote_type)
+    
+    create_samurai_button(
+        top_btn_frame,
+        "🏆 Топ цитат",
+        show_top,
+        color=SAMURAI_GOLD,
+        hover_color=SAMURAI_GOLD_HOVER,
+        width=120
+    ).pack(side='right')
+    
     create_samurai_label(content_frame, title, font=FONT_TITLE, text_color=SAMURAI_GOLD).pack(pady=20)
     
     disliked_ids = [
@@ -1181,41 +1436,61 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
         slider_frame = create_samurai_frame(content_frame, fg_color=SAMURAI_BG)
         slider_frame.pack(pady=10, padx=50, fill='both', expand=True)
         
-        quote_card = create_samurai_frame(slider_frame, border_color=SAMURAI_GOLD, height=300)
+        quote_card = create_samurai_frame(slider_frame, border_color=SAMURAI_GOLD, height=400)
         quote_card.pack(pady=10, fill='x')
         quote_card.pack_propagate(False)
         
         quote_text_frame = create_samurai_frame(quote_card, fg_color=SAMURAI_CARD)
-        quote_text_frame.pack(expand=True, fill='both', padx=30, pady=30)
+        quote_text_frame.pack(expand=True, fill='both', padx=30, pady=20)
         
         quote_label = create_samurai_label(
-            quote_text_frame, 
-            text="", 
-            font=("Georgia", 18, "italic"),
-            text_color="white",
-            wraplength=800,
-            justify='center'
+            quote_text_frame, text="", font=("Georgia", 18, "italic"),
+            text_color="white", wraplength=800, justify='center'
         )
         quote_label.pack(expand=True)
         
-        author_label = create_samurai_label(
-            quote_text_frame,
-            text="",
-            font=FONT_PRIMARY,
-            text_color=SAMURAI_GOLD
-        )
+        author_label = create_samurai_label(quote_text_frame, text="", font=FONT_PRIMARY, text_color=SAMURAI_GOLD)
         author_label.pack(pady=(20, 0))
+        
+        # Фрейм для отображения рейтинга
+        rating_frame = ctk.CTkFrame(quote_card, fg_color="transparent")
+        rating_frame.pack(fill='x', padx=20, pady=10)
         
         reaction_frame = create_samurai_frame(slider_frame, fg_color=SAMURAI_BG)
         reaction_frame.pack(pady=10)
         
         likes_count_label = create_samurai_label(
-            reaction_frame,
-            text="Честь: 0",
-            font=FONT_BOLD,
-            text_color=SAMURAI_GREEN
+            reaction_frame, text="Честь: 0", font=FONT_BOLD, text_color=SAMURAI_GREEN
         )
         likes_count_label.pack(side='left', padx=20)
+        
+        def update_rating_display():
+            if not quotes:
+                return
+            quote = quotes[current_quote_index]
+            
+            # Получаем данные о рейтинге из БД (средняя оценка всех пользователей)
+            try:
+                rating = QuoteRating.get_or_none(
+                    (QuoteRating.quote_id == quote.id) & 
+                    (QuoteRating.quote_type == quote_type)
+                )
+                if rating:
+                    rating_info = {
+                        'average': rating.average_rating,
+                        'votes': rating.votes_count
+                    }
+                else:
+                    rating_info = {'average': 0, 'votes': 0}
+            except:
+                rating_info = {'average': 0, 'votes': 0}
+            
+            # Очищаем фрейм рейтинга
+            for w in rating_frame.winfo_children():
+                w.destroy()
+            
+            # Отображаем виджет с частично заполненными звездами
+            RatingDisplayWidget(rating_frame, rating_info).pack(pady=5)
         
         def update_likes_count():
             if not quotes: return
@@ -1236,6 +1511,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
                 author_label.configure(text=f"— {quote.author}")
                 counter_label.configure(text=f"{current_quote_index + 1} из {len(quotes)}")
                 update_likes_count()
+                update_rating_display()
         
         def set_reaction(reaction_type):
             nonlocal current_quote_index
@@ -1266,30 +1542,16 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
                     update_quote_display()
                 else:
                     update_likes_count()
-                    
             except Exception as e:
                 logger.error(f"Ошибка при установке реакции: {e}")
 
         reaction_buttons_frame = create_samurai_frame(reaction_frame, fg_color=SAMURAI_BG)
         reaction_buttons_frame.pack(side='right')
         
-        create_samurai_button(
-            reaction_buttons_frame, 
-            "👍 Честь", 
-            lambda: set_reaction('like'),
-            color=SAMURAI_GREEN, 
-            hover_color=SAMURAI_GREEN_HOVER, 
-            width=100
-        ).pack(side='left', padx=5)
-        
-        create_samurai_button(
-            reaction_buttons_frame, 
-            "👎 Бесчестие", 
-            lambda: set_reaction('dislike'),
-            color=SAMURAI_RED, 
-            hover_color=SAMURAI_RED_HOVER, 
-            width=100
-        ).pack(side='left', padx=5)
+        create_samurai_button(reaction_buttons_frame, "👍 Честь", lambda: set_reaction('like'),
+                             color=SAMURAI_GREEN, hover_color=SAMURAI_GREEN_HOVER, width=100).pack(side='left', padx=5)
+        create_samurai_button(reaction_buttons_frame, "👎 Бесчестие", lambda: set_reaction('dislike'),
+                             color=SAMURAI_RED, hover_color=SAMURAI_RED_HOVER, width=100).pack(side='left', padx=5)
         
         nav_controls_frame = create_samurai_frame(slider_frame, fg_color=SAMURAI_BG)
         nav_controls_frame.pack(pady=20)
@@ -1309,40 +1571,18 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
             current_quote_index = random.randint(0, len(quotes) - 1)
             update_quote_display()
 
-        create_samurai_button(
-            nav_controls_frame, 
-            "<", 
-            prev_quote,
-            width=50, 
-            height=40,
-            font=("Arial", 16, "bold")
-        ).pack(side='left', padx=20)
+        create_samurai_button(nav_controls_frame, "<", prev_quote, width=50, height=40,
+                             font=("Arial", 16, "bold")).pack(side='left', padx=20)
         
-        counter_label = create_samurai_label(
-            nav_controls_frame,
-            text="0 / 0",
-            font=("Segoe UI", 16, "bold"),
-            text_color=SAMURAI_GOLD
-        )
+        counter_label = create_samurai_label(nav_controls_frame, text="0 / 0",
+                                            font=("Segoe UI", 16, "bold"), text_color=SAMURAI_GOLD)
         counter_label.pack(side='left', padx=20)
         
-        create_samurai_button(
-            nav_controls_frame, 
-            ">", 
-            next_quote,
-            width=50, 
-            height=40,
-            font=("Arial", 16, "bold")
-        ).pack(side='left', padx=20)
+        create_samurai_button(nav_controls_frame, ">", next_quote, width=50, height=40,
+                             font=("Arial", 16, "bold")).pack(side='left', padx=20)
         
-        create_samurai_button(
-            slider_frame,
-            "🎲 Случайная мудрость",
-            show_random_quote,
-            color=SAMURAI_PANEL,
-            hover_color="#333",
-            width=200
-        ).pack(pady=(0, 20))
+        create_samurai_button(slider_frame, "🎲 Случайная мудрость", show_random_quote,
+                             color=SAMURAI_PANEL, hover_color="#333", width=200).pack(pady=(0, 20))
         
         update_quote_display()
         
@@ -2588,8 +2828,6 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         border_color=SAMURAI_GOLD,
         button_color=SAMURAI_RED,
         button_hover_color=SAMURAI_RED_HOVER,
-        dropdown_fg_color=SAMURAI_PANEL,
-        dropdown_hover_color=SAMURAI_RED,
         width=200,
         command=lambda x: load_quotes_list(search_entry.get().strip())
     )

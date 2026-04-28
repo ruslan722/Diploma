@@ -9,3 +9,4 @@ customtkinter
 Fastapi
 uvicorn
 jinja2
+python-multipart

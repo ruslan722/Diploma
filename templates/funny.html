@@ -27,7 +27,7 @@
                 <div class="page-controls">
                     <div class="control-item"><button class="control-btn" title="Поиск">🔍</button><div class="control-dropdown"><span class="dropdown-label">Поиск юмора</span><input type="text" id="search-input" class="input-mini" placeholder="Введите текст..." value="{{ search_query or '' }}" onkeypress="if(event.key === 'Enter') applyFilters()"></div></div>
                     <div class="control-item"><button class="control-btn" title="Фильтр по автору">👤</button><div class="control-dropdown"><span class="dropdown-label">Автор</span><select id="author-filter" class="select-mini" onchange="applyFilters()"><option value="">Все авторы</option>{% for author in authors %}<option value="{{ author }}" {% if author_filter == author %}selected{% endif %}>{{ author }}</option>{% endfor %}</select></div></div>
-                    <div class="control-item"><button class="control-btn" title="Сортировка">⇅</button><div class="control-dropdown"><span class="dropdown-label">Сортировать по</span><select id="sort-select" class="select-mini" onchange="applyFilters()"><option value="default" {% if sort_by == 'default' %}selected{% endif %}>По умолчанию</option><option value="author_asc" {% if sort_by == 'author_asc' %}selected{% endif %}>Автор (А-Я)</option><option value="author_desc" {% if sort_by == 'author_desc' %}selected{% endif %}>Автор (Я-А)</option><option value="text_asc" {% if sort_by == 'text_asc' %}selected{% endif %}>Текст (А-Я)</option><option value="text_desc" {% if sort_by == 'text_desc' %}selected{% endif %}>Текст (Я-А)</option></select></div></div>
+                    <div class="control-item"><button class="control-btn" title="Сортировка">⇅</button><div class="control-dropdown"><span class="dropdown-label">Сортировать по</span><select id="sort-select" class="select-mini" onchange="applyFilters()"><option value="default" {% if sort_by == 'default' %}selected{% endif %}>По умолчанию</option><option value="author_asc" {% if sort_by == 'author_asc' %}selected{% endif %}>Автор (А-Я)</option><option value="author_desc" {% if sort_by == 'author_desc' %}selected{% endif %}>Автор (Я-А)</option><option value="text_asc" {% if sort_by == 'text_asc' %}selected{% endif %}>Текст (А-Я)</option><option value="text_desc" {% if sort_by == 'text_desc' %}selected{% endif %}>Текст (Я-А)</option><option value="rating_desc" {% if sort_by == 'rating_desc' %}selected{% endif %}>По рейтингу (высокий)</option><option value="rating_asc" {% if sort_by == 'rating_asc' %}selected{% endif %}>По рейтингу (низкий)</option></select></div></div>
                     <div class="control-item"><button class="control-btn" title="Режим тишины (Zen Mode)" onclick="window.location.href='/zen/funny'">🧘</button></div>
                     <div class="control-item"><button class="control-btn btn-reset-icon" title="Сбросить все" onclick="clearFilters()">🔄</button></div>
                 </div>
@@ -39,6 +39,20 @@
                         <div class="quote-card" data-id="{{ quote.id }}" data-type="funny">
                             <p class="quote-text">{{ quote.text|safe }}</p>
                             <p class="quote-author">{{ quote.author|safe if quote.author else 'Неизвестный автор' }}</p>
+                            
+                            <!-- Рейтинг звездами -->
+                            <div class="quote-rating" id="rating-container-{{ quote.id }}">
+                                <div class="rating-stars" id="stars-{{ quote.id }}">
+                                    {% for i in range(1, 6) %}
+                                        <span class="star" data-rating="{{ i }}" onclick="rateQuote('{{ quote.id }}', 'funny', {{ i }})" onmouseover="highlightStars('{{ quote.id }}', {{ i }})" onmouseout="resetStars('{{ quote.id }}')" title="Оценить на {{ i }} звезд">★</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="rating-info" id="rating-info-{{ quote.id }}">
+                                    <span class="rating-average" id="rating-avg-{{ quote.id }}">0.0</span>
+                                    <span class="rating-votes" id="rating-votes-{{ quote.id }}">(0 оценок)</span>
+                                </div>
+                            </div>
+                            
                             <div class="quote-reactions">
                                 <button class="btn-reaction like" onclick="sendReaction('{{ quote.id }}', 'funny', 'like')"><span class="icon">👍</span> <span class="count" id="like-count-{{ quote.id }}">0</span></button>
                                 <button class="btn-reaction dislike" onclick="sendReaction('{{ quote.id }}', 'funny', 'dislike')"><span class="icon">👎</span> <span class="count" id="dislike-count-{{ quote.id }}">0</span></button>
@@ -57,6 +71,7 @@
         const profileBtn = document.getElementById('profile-btn');
         let authState = { isAuthenticated: false, username: '', nickname: '', avatar_path: null, stats: { likes: 0, dislikes: 0, total: 0 } };
         let authMode = 'login', authModal = null, lampMode = 'off', rainbowInterval = null;
+        let userRatings = {};
 
         async function initAuth() { await checkAuthStatus(); updateProfileButton(); }
         async function checkAuthStatus() { try { const response = await fetch('/api/auth/me'); if (response.ok) { const data = await response.json(); authState = data; isAuthenticated = data.is_authenticated; currentUser = data; updateProfileButton(); } } catch (error) { console.error('Ошибка проверки авторизации:', error); } }
@@ -77,6 +92,29 @@
         function showForgotPassword() { showNotification('Функция восстановления пароля в разработке', 'warning'); }
         async function handleModalAuthSubmit(event) { event.preventDefault(); if (lampMode !== 'on') { showNotification('Включите лампу для авторизации! (Нажмите дважды)', 'warning'); return; } const form = event.target; const data = Object.fromEntries(new FormData(form).entries()); const messageDiv = document.getElementById('modal-auth-message'); const submitBtn = document.getElementById('modal-auth-submit'); messageDiv.innerHTML = ''; messageDiv.className = 'auth-modal-message'; submitBtn.disabled = true; submitBtn.textContent = 'Загрузка...'; try { const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register'; const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await response.json(); if (response.ok && result.success) { messageDiv.className = 'auth-modal-message success'; messageDiv.textContent = result.message; await checkAuthStatus(); showNotification(result.message, 'success'); setTimeout(() => { closeAuthModal(); updateProfileButton(); }, 1000); } else { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = result.message || 'Произошла ошибка'; showNotification(result.message || 'Произошла ошибка', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } } catch (error) { messageDiv.className = 'auth-modal-message error'; messageDiv.textContent = 'Ошибка соединения с сервером'; showNotification('Ошибка соединения с сервером', 'error'); submitBtn.disabled = false; submitBtn.textContent = authMode === 'login' ? 'Войти' : 'Зарегистрироваться'; } }
         async function handleLogout() { await fetch('/api/auth/logout', { method: 'POST' }); authState = { isAuthenticated: false }; isAuthenticated = false; updateProfileButton(); showNotification('Вы вышли из системы', 'success'); }
+
+        // ========== СИСТЕМА РЕЙТИНГА ==========
+        async function rateQuote(quoteId, quoteType, rating) {
+            if (!isAuthenticated) { showNotification("Пожалуйста, войдите, чтобы оценивать цитаты!", "warning"); openAuthModal(); return; }
+            try {
+                const response = await fetch('/api/rating', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quote_id: quoteId, quote_type: quoteType, rating: rating }) });
+                if (response.ok) {
+                    const data = await response.json();
+                    userRatings[`${quoteId}_${quoteType}`] = rating;
+                    updateStarsDisplay(quoteId, rating, true);
+                    updateRatingInfo(quoteId, data.average_rating, data.votes_count);
+                    showNotification(data.message, 'success');
+                } else if (response.status === 401) { const data = await response.json(); if (data.redirect) { showNotification("Пожалуйста, войдите, чтобы оценивать цитаты!", "warning"); openAuthModal(); } }
+                else { const data = await response.json(); showNotification(data.error || 'Ошибка при сохранении оценки', 'error'); }
+            } catch (error) { console.error('Ошибка при отправке оценки:', error); showNotification('Не удалось отправить оценку', 'error'); }
+        }
+        function highlightStars(quoteId, rating) { const starsContainer = document.getElementById(`stars-${quoteId}`); if (!starsContainer) return; const stars = starsContainer.querySelectorAll('.star'); stars.forEach((star, index) => { if (index < rating) { star.style.color = '#ffc107'; star.style.textShadow = '0 0 5px rgba(255,193,7,0.5)'; } else { star.style.color = '#aaa'; star.style.textShadow = 'none'; } }); }
+        function resetStars(quoteId) { const currentRating = userRatings[`${quoteId}_funny`] || 0; updateStarsDisplay(quoteId, currentRating, false); }
+        function updateStarsDisplay(quoteId, rating, isUserRated) { const starsContainer = document.getElementById(`stars-${quoteId}`); if (!starsContainer) return; const stars = starsContainer.querySelectorAll('.star'); stars.forEach((star, index) => { if (index < rating) { star.style.color = '#ffc107'; star.style.textShadow = '0 0 5px rgba(255,193,7,0.5)'; if (isUserRated) star.classList.add('user-rated'); } else { star.style.color = '#aaa'; star.style.textShadow = 'none'; star.classList.remove('user-rated'); } }); }
+        function updateRatingInfo(quoteId, averageRating, votesCount) { const avgElement = document.getElementById(`rating-avg-${quoteId}`); const votesElement = document.getElementById(`rating-votes-${quoteId}`); if (avgElement) avgElement.textContent = averageRating ? parseFloat(averageRating).toFixed(1) : '0.0'; if (votesElement) votesElement.textContent = `(${votesCount || 0} оценок)`; }
+        async function loadRating(quoteId, quoteType) { try { const ratingResponse = await fetch(`/api/rating?quote_id=${quoteId}&quote_type=${quoteType}`); if (ratingResponse.ok) { const ratingData = await ratingResponse.json(); updateRatingInfo(quoteId, ratingData.average_rating, ratingData.votes_count); const avgRating = Math.round(ratingData.average_rating || 0); updateStarsDisplay(quoteId, avgRating, false); } if (isAuthenticated) { const userRatingResponse = await fetch(`/api/rating/user?quote_id=${quoteId}&quote_type=${quoteType}`); if (userRatingResponse.ok) { const userData = await userRatingResponse.json(); if (userData.user_rating) { userRatings[`${quoteId}_${quoteType}`] = userData.user_rating; updateStarsDisplay(quoteId, userData.user_rating, true); } } } } catch (error) { console.error('Ошибка загрузки рейтинга:', error); } }
+
+        // ========== РЕАКЦИИ ==========
         async function sendReaction(quoteId, quoteType, reactionType) { if (!isAuthenticated) { showNotification("Пожалуйста, войдите, чтобы оставлять реакции!", "warning"); openAuthModal(); return; } const button = event.currentTarget; button.style.transform = 'scale(0.95)'; setTimeout(() => button.style.transform = '', 150); try { const response = await fetch('/api/reaction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quote_id: quoteId, quote_type: quoteType, reaction: reactionType }) }); if (response.ok) { const data = await response.json(); if (data.likes_count !== undefined) document.getElementById(`like-count-${quoteId}`).textContent = data.likes_count; if (data.dislikes_count !== undefined) document.getElementById(`dislike-count-${quoteId}`).textContent = data.dislikes_count; showNotification(`Ваша реакция "${reactionType === 'like' ? '👍 Нравится' : '👎 Не нравится'}" учтена!`, "success"); button.classList.add('reaction-animation'); setTimeout(() => button.classList.remove('reaction-animation'), 500); } else showNotification("Произошла ошибка при отправке реакции", "error"); } catch (error) { showNotification("Не удалось отправить реакцию", "error"); } }
         function showNotification(message, type) { const notification = document.createElement('div'); notification.className = `notification notification-${type}`; notification.textContent = message; notification.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;background:${type==='success'?'#4caf50':type==='warning'?'#ff9800':'#f44336'};color:white;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.2);z-index:10000;animation:slideIn 0.3s ease;font-weight:bold;`; document.body.appendChild(notification); setTimeout(() => { notification.style.animation = 'slideOut 0.3s ease'; setTimeout(() => notification.remove(), 300); }, 3000); }
         function escapeHtml(text) { if (!text) return ''; const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
@@ -87,10 +125,11 @@
         document.addEventListener('click', () => document.querySelectorAll('.control-dropdown').forEach(dd => dd.classList.remove('show')));
         document.querySelectorAll('.control-dropdown').forEach(dd => dd.addEventListener('click', e => e.stopPropagation()));
         async function loadReactionsCount() { for (const card of document.querySelectorAll('.quote-card')) { const quoteId = card.dataset.id, quoteType = card.dataset.type; try { const response = await fetch(`/api/reactions/count?quote_id=${quoteId}&quote_type=${quoteType}`); if (response.ok) { const data = await response.json(); const likeCount = document.getElementById(`like-count-${quoteId}`); const dislikeCount = document.getElementById(`dislike-count-${quoteId}`); if (likeCount) likeCount.textContent = data.likes || 0; if (dislikeCount) dislikeCount.textContent = data.dislikes || 0; } } catch (error) {} } }
+        async function loadAllRatings() { for (const card of document.querySelectorAll('.quote-card')) { const quoteId = card.dataset.id, quoteType = card.dataset.type; if (quoteId && quoteType) await loadRating(quoteId, quoteType); } }
         function toggleTheme() { const body = document.body, themeIcon = document.querySelector('.theme-icon'); if (body.classList.contains('light-theme')) { body.classList.remove('light-theme'); localStorage.setItem('theme', 'dark'); if (themeIcon) themeIcon.textContent = '🌙'; } else { body.classList.add('light-theme'); localStorage.setItem('theme', 'light'); if (themeIcon) themeIcon.textContent = '☀️'; } }
         const savedTheme = localStorage.getItem('theme'), themeIcon = document.querySelector('.theme-icon');
         if (savedTheme === 'light') { document.body.classList.add('light-theme'); if (themeIcon) themeIcon.textContent = '☀️'; } else { if (themeIcon) themeIcon.textContent = '🌙'; }
-        initAuth(); document.addEventListener('DOMContentLoaded', loadReactionsCount);
+        initAuth(); document.addEventListener('DOMContentLoaded', () => { loadReactionsCount(); loadAllRatings(); });
     </script>
 </body>
 </html>

@@ -69,6 +69,8 @@
                                 <option value="author_desc" {% if sort_by == 'author_desc' %}selected{% endif %}>Автор (Я-А)</option>
                                 <option value="text_asc" {% if sort_by == 'text_asc' %}selected{% endif %}>Текст (А-Я)</option>
                                 <option value="text_desc" {% if sort_by == 'text_desc' %}selected{% endif %}>Текст (Я-А)</option>
+                                <option value="rating_desc" {% if sort_by == 'rating_desc' %}selected{% endif %}>По рейтингу (высокий)</option>
+                                <option value="rating_asc" {% if sort_by == 'rating_asc' %}selected{% endif %}>По рейтингу (низкий)</option>
                             </select>
                         </div>
                     </div>
@@ -95,6 +97,19 @@
                         <div class="quote-card" data-id="{{ quote.id }}" data-type="motivation">
                             <p class="quote-text">{{ quote.text|safe }}</p>
                             <p class="quote-author">{{ quote.author|safe if quote.author else 'Неизвестный автор' }}</p>
+                            
+                            <!-- Рейтинг звездами -->
+                            <div class="quote-rating" id="rating-container-{{ quote.id }}">
+                                <div class="rating-stars" id="stars-{{ quote.id }}">
+                                    {% for i in range(1, 6) %}
+                                        <span class="star" data-rating="{{ i }}" onclick="rateQuote('{{ quote.id }}', 'motivation', {{ i }})" onmouseover="highlightStars('{{ quote.id }}', {{ i }})" onmouseout="resetStars('{{ quote.id }}')" title="Оценить на {{ i }} звезд">★</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="rating-info" id="rating-info-{{ quote.id }}">
+                                    <span class="rating-average" id="rating-avg-{{ quote.id }}">0.0</span>
+                                    <span class="rating-votes" id="rating-votes-{{ quote.id }}">(0 оценок)</span>
+                                </div>
+                            </div>
                             
                             <div class="quote-reactions">
                                 <button class="btn-reaction like" onclick="sendReaction('{{ quote.id }}', 'motivation', 'like')">
@@ -133,6 +148,8 @@
         let authModal = null;
         let lampMode = 'off';
         let rainbowInterval = null;
+        // Хранилище оценок пользователя
+        let userRatings = {};
 
         async function initAuth() {
             await checkAuthStatus();
@@ -348,6 +365,137 @@
             updateProfileButton(); showNotification('Вы вышли из системы', 'success');
         }
 
+        // ========== СИСТЕМА РЕЙТИНГА ==========
+        
+        async function rateQuote(quoteId, quoteType, rating) {
+            if (!isAuthenticated) {
+                showNotification("Пожалуйста, войдите, чтобы оценивать цитаты!", "warning");
+                openAuthModal();
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/rating', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        quote_id: quoteId,
+                        quote_type: quoteType,
+                        rating: rating
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Сохраняем оценку пользователя
+                    userRatings[`${quoteId}_${quoteType}`] = rating;
+                    
+                    // Обновляем отображение звезд
+                    updateStarsDisplay(quoteId, rating, true);
+                    
+                    // Обновляем информацию о рейтинге
+                    updateRatingInfo(quoteId, data.average_rating, data.votes_count);
+                    
+                    showNotification(data.message, 'success');
+                } else if (response.status === 401) {
+                    const data = await response.json();
+                    if (data.redirect) {
+                        showNotification("Пожалуйста, войдите, чтобы оценивать цитаты!", "warning");
+                        openAuthModal();
+                    }
+                } else {
+                    const data = await response.json();
+                    showNotification(data.error || 'Ошибка при сохранении оценки', 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка при отправке оценки:', error);
+                showNotification('Не удалось отправить оценку', 'error');
+            }
+        }
+        
+        function highlightStars(quoteId, rating) {
+            const starsContainer = document.getElementById(`stars-${quoteId}`);
+            if (!starsContainer) return;
+            
+            const stars = starsContainer.querySelectorAll('.star');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.style.color = '#ffc107';
+                    star.style.textShadow = '0 0 5px rgba(255,193,7,0.5)';
+                } else {
+                    star.style.color = '#aaa';
+                    star.style.textShadow = 'none';
+                }
+            });
+        }
+        
+        function resetStars(quoteId) {
+            const currentRating = userRatings[`${quoteId}_motivation`] || 0;
+            updateStarsDisplay(quoteId, currentRating, false);
+        }
+        
+        function updateStarsDisplay(quoteId, rating, isUserRated) {
+            const starsContainer = document.getElementById(`stars-${quoteId}`);
+            if (!starsContainer) return;
+            
+            const stars = starsContainer.querySelectorAll('.star');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.style.color = '#ffc107';
+                    star.style.textShadow = '0 0 5px rgba(255,193,7,0.5)';
+                    if (isUserRated) {
+                        star.classList.add('user-rated');
+                    }
+                } else {
+                    star.style.color = '#aaa';
+                    star.style.textShadow = 'none';
+                    star.classList.remove('user-rated');
+                }
+            });
+        }
+        
+        function updateRatingInfo(quoteId, averageRating, votesCount) {
+            const avgElement = document.getElementById(`rating-avg-${quoteId}`);
+            const votesElement = document.getElementById(`rating-votes-${quoteId}`);
+            
+            if (avgElement) {
+                avgElement.textContent = averageRating ? parseFloat(averageRating).toFixed(1) : '0.0';
+            }
+            if (votesElement) {
+                votesElement.textContent = `(${votesCount || 0} оценок)`;
+            }
+        }
+        
+        async function loadRating(quoteId, quoteType) {
+            try {
+                // Загружаем общий рейтинг
+                const ratingResponse = await fetch(`/api/rating?quote_id=${quoteId}&quote_type=${quoteType}`);
+                if (ratingResponse.ok) {
+                    const ratingData = await ratingResponse.json();
+                    updateRatingInfo(quoteId, ratingData.average_rating, ratingData.votes_count);
+                    
+                    // Отображаем звезды
+                    const avgRating = Math.round(ratingData.average_rating || 0);
+                    updateStarsDisplay(quoteId, avgRating, false);
+                }
+                
+                // Загружаем оценку пользователя
+                if (isAuthenticated) {
+                    const userRatingResponse = await fetch(`/api/rating/user?quote_id=${quoteId}&quote_type=${quoteType}`);
+                    if (userRatingResponse.ok) {
+                        const userData = await userRatingResponse.json();
+                        if (userData.user_rating) {
+                            userRatings[`${quoteId}_${quoteType}`] = userData.user_rating;
+                            updateStarsDisplay(quoteId, userData.user_rating, true);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки рейтинга:', error);
+            }
+        }
+
         // ========== РЕАКЦИИ ==========
         async function sendReaction(quoteId, quoteType, reactionType) {
             if (!isAuthenticated) { showNotification("Пожалуйста, войдите, чтобы оставлять реакции!", "warning"); openAuthModal(); return; }
@@ -418,6 +566,15 @@
                 } catch (error) {}
             }
         }
+        
+        async function loadAllRatings() {
+            for (const card of document.querySelectorAll('.quote-card')) {
+                const quoteId = card.dataset.id, quoteType = card.dataset.type;
+                if (quoteId && quoteType) {
+                    await loadRating(quoteId, quoteType);
+                }
+            }
+        }
 
         function toggleTheme() {
             const body = document.body, themeIcon = document.querySelector('.theme-icon');
@@ -435,7 +592,10 @@
         else { if (themeIcon) themeIcon.textContent = '🌙'; }
 
         initAuth();
-        document.addEventListener('DOMContentLoaded', loadReactionsCount);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadReactionsCount();
+            loadAllRatings();
+        });
     </script>
 </body>
 </html>

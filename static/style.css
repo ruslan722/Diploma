@@ -1758,3 +1758,84 @@ body.light-theme ::-webkit-scrollbar-thumb {
 body.light-theme ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(135deg, #DAA520 0%, #B8860B 100%);
 }
+
+/* ========== ЗВЕЗДНЫЙ РЕЙТИНГ ========== */
+
+.quote-rating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.rating-stars {
+    display: flex;
+    gap: 5px;
+}
+
+.star {
+    font-size: 20px;
+    cursor: pointer;
+    transition: transform 0.2s, color 0.2s;
+    color: #aaa;
+}
+
+.star:hover {
+    transform: scale(1.2);
+    color: #ffc107 !important;
+}
+
+.star.user-rated {
+    color: #ffc107;
+    text-shadow: 0 0 2px rgba(255,193,7,0.5);
+}
+
+.rating-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Светлая тема для рейтинга */
+body.light-theme .star {
+    color: #ccc;
+}
+
+body.light-theme .star.user-rated {
+    color: #ff9800;
+}
+
+body.light-theme .star:hover {
+    color: #ff9800 !important;
+}
+
+body.light-theme .quote-rating {
+    border-top-color: rgba(184, 134, 11, 0.3);
+}
+
+/* ========== ИСПРАВЛЕНИЕ ЦВЕТА ТЕКСТА НА КНОПКАХ В ПРОФИЛЕ ========== */
+
+/* Стили для кнопок загрузки и удаления фото в профиле */
+.avatar-actions .btn-secondary {
+    color: #ffffff !important;
+    background: var(--accent-color) !important;
+    border: 1px solid var(--primary-color) !important;
+}
+
+.avatar-actions .btn-secondary:hover {
+    background: var(--accent-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Светлая тема для кнопок в профиле */
+body.light-theme .avatar-actions .btn-secondary {
+    color: #ffffff !important;
+    background: #0f3460 !important;
+    border: 1px solid #B8860B !important;
+}
+
+body.light-theme .avatar-actions .btn-secondary:hover {
+    background: #16213e !important;
+    color: #ffffff !important;
+}

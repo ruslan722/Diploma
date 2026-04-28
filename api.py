@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 from connect import Motivation, Affirmation, FunnyQuote, Avtorization, \
-    UserReaction, UserProfile, Category, CategoryQuote
+    UserReaction, UserProfile, Category, CategoryQuote, QuoteRating, UserQuoteRating, db
 
 app = FastAPI()
 
@@ -97,6 +97,7 @@ def quote_to_dict(quote, quote_type):
         'text': quote.text,
         'author': quote.author if quote.author else ''
     }
+
 
 # ========== ЭНДПОИНТЫ АВТОРИЗАЦИИ ==========
 
@@ -417,34 +418,320 @@ async def delete_avatar(request: Request):
         )
 
 
-@app.post('/api/auth/check-username')
-async def check_username(request: Request):
-    """Проверка доступности имени пользователя"""
+# ========== API ДЛЯ РЕЙТИНГА ==========
+
+@app.post('/api/rating')
+async def add_rating(request: Request):
+    """Поставить оценку цитате (1-5 звезд)"""
     try:
         data = await request.json()
-        username = data.get('username', '').strip()
+        quote_id = data.get('quote_id')
+        quote_type = data.get('quote_type')
+        rating = data.get('rating')
         
-        if len(username) < 3:
-            return JSONResponse({
-                "available": False,
-                "message": "Имя должно быть не менее 3 символов"
-            })
+        session_user = get_session_user(request)
+        if not session_user:
+            return JSONResponse(
+                {"error": "Требуется авторизация", "redirect": True}, 
+                status_code=401
+            )
         
-        existing = Avtorization.get_or_none(Avtorization.username == username)
+        username = session_user["username"]
+        
+        if not all([quote_id, quote_type, rating]):
+            return JSONResponse(
+                {"error": "Missing required fields"}, 
+                status_code=400
+            )
+        
+        rating = int(rating)
+        if rating < 1 or rating > 5:
+            return JSONResponse(
+                {"error": "Rating must be between 1 and 5"}, 
+                status_code=400
+            )
+        
+        with db.atomic():
+            # Получаем или создаем запись рейтинга
+            rating_record, created = QuoteRating.get_or_create(
+                quote_id=quote_id,
+                quote_type=quote_type,
+                defaults={'total_rating': 0, 'votes_count': 0, 'average_rating': 0}
+            )
+            
+            # Проверяем, голосовал ли пользователь ранее
+            try:
+                user_rating = UserQuoteRating.get(
+                    (UserQuoteRating.username == username) &
+                    (UserQuoteRating.quote_id == quote_id) &
+                    (UserQuoteRating.quote_type == quote_type)
+                )
+                
+                # Обновляем существующую оценку
+                old_rating = user_rating.rating
+                rating_record.total_rating = rating_record.total_rating - old_rating + rating
+                user_rating.rating = rating
+                user_rating.updated_at = datetime.now()
+                user_rating.save()
+                
+                message = f"Оценка обновлена с {old_rating}★ на {rating}★"
+                
+            except UserQuoteRating.DoesNotExist:
+                # Новая оценка
+                rating_record.total_rating += rating
+                rating_record.votes_count += 1
+                
+                UserQuoteRating.create(
+                    username=username,
+                    quote_id=quote_id,
+                    quote_type=quote_type,
+                    rating=rating
+                )
+                
+                message = f"Оценка {rating}★ добавлена!"
+            
+            # Пересчитываем средний рейтинг
+            if rating_record.votes_count > 0:
+                rating_record.average_rating = rating_record.total_rating / rating_record.votes_count
+            rating_record.updated_at = datetime.now()
+            rating_record.save()
         
         return JSONResponse({
-            "available": existing is None,
-            "message": "Имя свободно" if existing is None else "Имя уже занято"
+            "success": True,
+            "message": message,
+            "average_rating": rating_record.average_rating,
+            "votes_count": rating_record.votes_count,
+            "user_rating": rating
         })
         
     except Exception as e:
+        print(f"Error in add_rating: {e}")
         return JSONResponse(
-            {"available": False, "message": str(e)},
+            {"error": str(e)}, 
             status_code=500
         )
 
 
-# ========== ГЛАВНАЯ СТРАНИЦА ==========
+@app.get('/api/rating')
+async def get_rating(
+    quote_id: int = Query(...),
+    quote_type: str = Query(...)
+):
+    """Получить рейтинг цитаты"""
+    try:
+        rating = QuoteRating.get_or_none(
+            (QuoteRating.quote_id == quote_id) &
+            (QuoteRating.quote_type == quote_type)
+        )
+        
+        if rating:
+            return JSONResponse({
+                "average_rating": rating.average_rating,
+                "votes_count": rating.votes_count,
+                "total_rating": rating.total_rating
+            })
+        else:
+            return JSONResponse({
+                "average_rating": 0,
+                "votes_count": 0,
+                "total_rating": 0
+            })
+            
+    except Exception as e:
+        print(f"Error in get_rating: {e}")
+        return JSONResponse(
+            {"error": str(e)}, 
+            status_code=500
+        )
+
+
+@app.get('/api/rating/user')
+async def get_user_rating(
+    request: Request,
+    quote_id: int = Query(...),
+    quote_type: str = Query(...)
+):
+    """Получить оценку пользователя для цитаты"""
+    session_user = get_session_user(request)
+    if not session_user:
+        return JSONResponse({"user_rating": None})
+    
+    try:
+        user_rating = UserQuoteRating.get_or_none(
+            (UserQuoteRating.username == session_user["username"]) &
+            (UserQuoteRating.quote_id == quote_id) &
+            (UserQuoteRating.quote_type == quote_type)
+        )
+        
+        return JSONResponse({
+            "user_rating": user_rating.rating if user_rating else None
+        })
+        
+    except Exception as e:
+        print(f"Error in get_user_rating: {e}")
+        return JSONResponse(
+            {"error": str(e)}, 
+            status_code=500
+        )
+
+
+@app.get('/api/rating/top')
+async def get_top_rated(
+    quote_type: Optional[str] = None,
+    limit: int = Query(10, ge=1, le=50),
+    min_votes: int = Query(1, ge=1)
+):
+    """Получить топ цитат по рейтингу"""
+    try:
+        query = QuoteRating.select().where(
+            QuoteRating.votes_count >= min_votes
+        ).order_by(QuoteRating.average_rating.desc()).limit(limit)
+        
+        if quote_type:
+            query = query.where(QuoteRating.quote_type == quote_type)
+        
+        results = []
+        models = {
+            'motivation': Motivation,
+            'affirmation': Affirmation,
+            'funny': FunnyQuote
+        }
+        
+        for rating in query:
+            model = models.get(rating.quote_type)
+            if model:
+                quote = model.get_or_none(
+                    (model.id == rating.quote_id) & 
+                    (model.is_deleted == False)
+                )
+                if quote:
+                    results.append({
+                        'id': quote.id,
+                        'type': rating.quote_type,
+                        'text': quote.text[:200] + '...' if len(quote.text) > 200 else quote.text,
+                        'author': quote.author if quote.author else '',
+                        'average_rating': round(rating.average_rating, 1),
+                        'votes_count': rating.votes_count
+                    })
+        
+        return JSONResponse({"top_quotes": results})
+        
+    except Exception as e:
+        print(f"Error in get_top_rated: {e}")
+        return JSONResponse(
+            {"error": str(e)}, 
+            status_code=500
+        )
+
+
+# ========== API ДЛЯ РЕАКЦИЙ ==========
+
+@app.post('/api/reaction')
+async def add_reaction(request: Request):
+    try:
+        data = await request.json()
+        quote_id = data.get('quote_id')
+        quote_type = data.get('quote_type')
+        reaction_type = data.get('reaction')
+        
+        session_user = get_session_user(request)
+        if not session_user:
+            return JSONResponse(
+                {"error": "Требуется авторизация", "redirect": True}, 
+                status_code=401
+            )
+        
+        username = session_user["username"]
+        
+        if not all([quote_id, quote_type, reaction_type]):
+            return JSONResponse(
+                {"error": "Missing required fields"}, 
+                status_code=400
+            )
+        
+        existing = UserReaction.get_or_none(
+            (UserReaction.username == username) &
+            (UserReaction.quote_id == quote_id) &
+            (UserReaction.quote_type == quote_type)
+        )
+        
+        if existing:
+            if existing.reaction == reaction_type:
+                existing.delete_instance()
+                user_reaction = None
+            else:
+                existing.reaction = reaction_type
+                existing.created_at = datetime.now()
+                existing.save()
+                user_reaction = reaction_type
+        else:
+            UserReaction.create(
+                username=username,
+                quote_id=quote_id,
+                quote_type=quote_type,
+                reaction=reaction_type
+            )
+            user_reaction = reaction_type
+        
+        likes_count = UserReaction.select().where(
+            (UserReaction.quote_id == quote_id) &
+            (UserReaction.quote_type == quote_type) &
+            (UserReaction.reaction == 'like')
+        ).count()
+        
+        dislikes_count = UserReaction.select().where(
+            (UserReaction.quote_id == quote_id) &
+            (UserReaction.quote_type == quote_type) &
+            (UserReaction.reaction == 'dislike')
+        ).count()
+        
+        return JSONResponse({
+            "success": True,
+            "likes_count": likes_count,
+            "dislikes_count": dislikes_count,
+            "user_reaction": user_reaction
+        })
+        
+    except Exception as e:
+        print(f"Error in add_reaction: {e}")
+        return JSONResponse(
+            {"error": str(e)}, 
+            status_code=500
+        )
+
+
+@app.get('/api/reactions/count')
+async def get_reactions_count(
+    quote_id: int = Query(...),
+    quote_type: str = Query(...)
+):
+    try:
+        likes_count = UserReaction.select().where(
+            (UserReaction.quote_id == quote_id) &
+            (UserReaction.quote_type == quote_type) &
+            (UserReaction.reaction == 'like')
+        ).count()
+        
+        dislikes_count = UserReaction.select().where(
+            (UserReaction.quote_id == quote_id) &
+            (UserReaction.quote_type == quote_type) &
+            (UserReaction.reaction == 'dislike')
+        ).count()
+        
+        return JSONResponse({
+            "likes": likes_count,
+            "dislikes": dislikes_count
+        })
+        
+    except Exception as e:
+        print(f"Error in get_reactions_count: {e}")
+        return JSONResponse(
+            {"error": str(e)}, 
+            status_code=500
+        )
+
+
+# ========== СТРАНИЦЫ HTML ==========
 
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request, q: Optional[str] = None):
@@ -458,7 +745,6 @@ async def index(request: Request, q: Optional[str] = None):
     )
 
 
-# Глобальный поиск
 @app.get('/search', response_class=HTMLResponse)
 async def global_search(request: Request, q: str = Query(..., min_length=1)):
     results = {
@@ -547,17 +833,32 @@ async def motivation(
     all_authors = list(set([m.author for m in Motivation.select().where(Motivation.is_deleted == False) if m.author]))
     all_authors.sort()
     
-    if sort:
-        if sort == 'author_asc':
-            query = query.order_by(Motivation.author.asc())
-        elif sort == 'author_desc':
-            query = query.order_by(Motivation.author.desc())
-        elif sort == 'text_asc':
-            query = query.order_by(Motivation.text.asc())
-        elif sort == 'text_desc':
-            query = query.order_by(Motivation.text.desc())
+    # Получаем все цитаты
+    mot = list(query)
     
-    mot = query
+    # Сортировка
+    if sort and sort.startswith('rating_'):
+        # Добавляем рейтинг к каждой цитате
+        for quote in mot:
+            rating = QuoteRating.get_or_none(
+                (QuoteRating.quote_id == quote.id) & 
+                (QuoteRating.quote_type == 'motivation')
+            )
+            quote._rating = rating.average_rating if rating else 0
+        
+        if sort == 'rating_desc':
+            mot.sort(key=lambda x: x._rating, reverse=True)
+        elif sort == 'rating_asc':
+            mot.sort(key=lambda x: x._rating)
+    elif sort:
+        if sort == 'author_asc':
+            mot.sort(key=lambda x: x.author if x.author else '')
+        elif sort == 'author_desc':
+            mot.sort(key=lambda x: x.author if x.author else '', reverse=True)
+        elif sort == 'text_asc':
+            mot.sort(key=lambda x: x.text)
+        elif sort == 'text_desc':
+            mot.sort(key=lambda x: x.text, reverse=True)
     
     moviv = []
     for i in mot:
@@ -613,17 +914,31 @@ async def affirmation(
     all_authors = list(set([a.author for a in Affirmation.select().where(Affirmation.is_deleted == False) if a.author]))
     all_authors.sort()
     
-    if sort:
-        if sort == 'author_asc':
-            query = query.order_by(Affirmation.author.asc())
-        elif sort == 'author_desc':
-            query = query.order_by(Affirmation.author.desc())
-        elif sort == 'text_asc':
-            query = query.order_by(Affirmation.text.asc())
-        elif sort == 'text_desc':
-            query = query.order_by(Affirmation.text.desc())
+    # Получаем все цитаты
+    aff = list(query)
     
-    aff = query
+    # Сортировка
+    if sort and sort.startswith('rating_'):
+        for quote in aff:
+            rating = QuoteRating.get_or_none(
+                (QuoteRating.quote_id == quote.id) & 
+                (QuoteRating.quote_type == 'affirmation')
+            )
+            quote._rating = rating.average_rating if rating else 0
+        
+        if sort == 'rating_desc':
+            aff.sort(key=lambda x: x._rating, reverse=True)
+        elif sort == 'rating_asc':
+            aff.sort(key=lambda x: x._rating)
+    elif sort:
+        if sort == 'author_asc':
+            aff.sort(key=lambda x: x.author if x.author else '')
+        elif sort == 'author_desc':
+            aff.sort(key=lambda x: x.author if x.author else '', reverse=True)
+        elif sort == 'text_asc':
+            aff.sort(key=lambda x: x.text)
+        elif sort == 'text_desc':
+            aff.sort(key=lambda x: x.text, reverse=True)
     
     affir = []
     for i in aff:
@@ -679,17 +994,31 @@ async def funny(
     all_authors = list(set([f.author for f in FunnyQuote.select().where(FunnyQuote.is_deleted == False) if f.author]))
     all_authors.sort()
     
-    if sort:
-        if sort == 'author_asc':
-            query = query.order_by(FunnyQuote.author.asc())
-        elif sort == 'author_desc':
-            query = query.order_by(FunnyQuote.author.desc())
-        elif sort == 'text_asc':
-            query = query.order_by(FunnyQuote.text.asc())
-        elif sort == 'text_desc':
-            query = query.order_by(FunnyQuote.text.desc())
+    # Получаем все цитаты
+    fun = list(query)
     
-    fun = query
+    # Сортировка
+    if sort and sort.startswith('rating_'):
+        for quote in fun:
+            rating = QuoteRating.get_or_none(
+                (QuoteRating.quote_id == quote.id) & 
+                (QuoteRating.quote_type == 'funny')
+            )
+            quote._rating = rating.average_rating if rating else 0
+        
+        if sort == 'rating_desc':
+            fun.sort(key=lambda x: x._rating, reverse=True)
+        elif sort == 'rating_asc':
+            fun.sort(key=lambda x: x._rating)
+    elif sort:
+        if sort == 'author_asc':
+            fun.sort(key=lambda x: x.author if x.author else '')
+        elif sort == 'author_desc':
+            fun.sort(key=lambda x: x.author if x.author else '', reverse=True)
+        elif sort == 'text_asc':
+            fun.sort(key=lambda x: x.text)
+        elif sort == 'text_desc':
+            fun.sort(key=lambda x: x.text, reverse=True)
     
     funny_quotes = []
     for i in fun:
@@ -942,8 +1271,6 @@ async def profile(request: Request):
     )
 
 
-# ========== РЕЖИМ ТИШИНЫ (ZEN MODE) ==========
-
 @app.get('/zen/{quote_type}', response_class=HTMLResponse)
 async def zen_mode(
     request: Request,
@@ -983,238 +1310,6 @@ async def zen_mode(
     )
 
 
-# ========== API ДЛЯ РЕАКЦИЙ ==========
-
-@app.post('/api/reaction')
-async def add_reaction(request: Request):
-    try:
-        data = await request.json()
-        quote_id = data.get('quote_id')
-        quote_type = data.get('quote_type')
-        reaction_type = data.get('reaction')
-        
-        session_user = get_session_user(request)
-        if not session_user:
-            return JSONResponse(
-                {"error": "Требуется авторизация", "redirect": True}, 
-                status_code=401
-            )
-        
-        username = session_user["username"]
-        
-        if not all([quote_id, quote_type, reaction_type]):
-            return JSONResponse(
-                {"error": "Missing required fields"}, 
-                status_code=400
-            )
-        
-        existing = UserReaction.get_or_none(
-            (UserReaction.username == username) &
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type)
-        )
-        
-        if existing:
-            if existing.reaction == reaction_type:
-                existing.delete_instance()
-                user_reaction = None
-            else:
-                existing.reaction = reaction_type
-                existing.created_at = datetime.now()
-                existing.save()
-                user_reaction = reaction_type
-        else:
-            UserReaction.create(
-                username=username,
-                quote_id=quote_id,
-                quote_type=quote_type,
-                reaction=reaction_type
-            )
-            user_reaction = reaction_type
-        
-        likes_count = UserReaction.select().where(
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type) &
-            (UserReaction.reaction == 'like')
-        ).count()
-        
-        dislikes_count = UserReaction.select().where(
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type) &
-            (UserReaction.reaction == 'dislike')
-        ).count()
-        
-        return JSONResponse({
-            "success": True,
-            "likes_count": likes_count,
-            "dislikes_count": dislikes_count,
-            "user_reaction": user_reaction
-        })
-        
-    except Exception as e:
-        print(f"Error in add_reaction: {e}")
-        return JSONResponse(
-            {"error": str(e)}, 
-            status_code=500
-        )
-
-
-@app.get('/api/reactions/count')
-async def get_reactions_count(
-    quote_id: int = Query(...),
-    quote_type: str = Query(...)
-):
-    try:
-        likes_count = UserReaction.select().where(
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type) &
-            (UserReaction.reaction == 'like')
-        ).count()
-        
-        dislikes_count = UserReaction.select().where(
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type) &
-            (UserReaction.reaction == 'dislike')
-        ).count()
-        
-        return JSONResponse({
-            "likes": likes_count,
-            "dislikes": dislikes_count
-        })
-        
-    except Exception as e:
-        print(f"Error in get_reactions_count: {e}")
-        return JSONResponse(
-            {"error": str(e)}, 
-            status_code=500
-        )
-
-
-@app.get('/api/reactions/user')
-async def get_user_reaction(
-    request: Request,
-    quote_id: int = Query(...),
-    quote_type: str = Query(...)
-):
-    session_user = get_session_user(request)
-    if not session_user:
-        return JSONResponse({"user_reaction": None})
-    
-    try:
-        reaction = UserReaction.get_or_none(
-            (UserReaction.username == session_user["username"]) &
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type)
-        )
-        
-        return JSONResponse({
-            "user_reaction": reaction.reaction if reaction else None
-        })
-        
-    except Exception as e:
-        print(f"Error in get_user_reaction: {e}")
-        return JSONResponse(
-            {"error": str(e)}, 
-            status_code=500
-        )
-
-
-@app.get('/api/reactions/all')
-async def get_all_reactions():
-    try:
-        reactions = UserReaction.select().order_by(UserReaction.created_at.desc())
-        
-        result = []
-        for r in reactions:
-            quote_text = ""
-            if r.quote_type == 'motivation':
-                quote = Motivation.get_or_none(Motivation.id == r.quote_id)
-                quote_text = quote.text[:50] + "..." if quote else "Цитата удалена"
-            elif r.quote_type == 'affirmation':
-                quote = Affirmation.get_or_none(Affirmation.id == r.quote_id)
-                quote_text = quote.text[:50] + "..." if quote else "Цитата удалена"
-            elif r.quote_type == 'funny':
-                quote = FunnyQuote.get_or_none(FunnyQuote.id == r.quote_id)
-                quote_text = quote.text[:50] + "..." if quote else "Цитата удалена"
-            
-            result.append({
-                'id': r.id,
-                'username': r.username,
-                'quote_id': r.quote_id,
-                'quote_type': r.quote_type,
-                'quote_text': quote_text,
-                'reaction': r.reaction,
-                'created_at': r.created_at.isoformat() if r.created_at else None
-            })
-        
-        return JSONResponse({"reactions": result})
-        
-    except Exception as e:
-        print(f"Error in get_all_reactions: {e}")
-        return JSONResponse(
-            {"error": str(e)}, 
-            status_code=500
-        )
-
-
-@app.delete('/api/reaction')
-async def delete_reaction(request: Request):
-    try:
-        data = await request.json()
-        quote_id = data.get('quote_id')
-        quote_type = data.get('quote_type')
-        
-        session_user = get_session_user(request)
-        if not session_user:
-            return JSONResponse(
-                {"error": "Требуется авторизация"}, 
-                status_code=401
-            )
-        
-        username = session_user["username"]
-        
-        if not all([quote_id, quote_type]):
-            return JSONResponse(
-                {"error": "Missing required fields"}, 
-                status_code=400
-            )
-        
-        reaction = UserReaction.get_or_none(
-            (UserReaction.username == username) &
-            (UserReaction.quote_id == quote_id) &
-            (UserReaction.quote_type == quote_type)
-        )
-        
-        if reaction:
-            reaction.delete_instance()
-            
-            likes_count = UserReaction.select().where(
-                (UserReaction.quote_id == quote_id) &
-                (UserReaction.quote_type == quote_type) &
-                (UserReaction.reaction == 'like')
-            ).count()
-            
-            dislikes_count = UserReaction.select().where(
-                (UserReaction.quote_id == quote_id) &
-                (UserReaction.quote_type == quote_type) &
-                (UserReaction.reaction == 'dislike')
-            ).count()
-            
-            return JSONResponse({
-                "success": True,
-                "message": "Reaction deleted",
-                "likes_count": likes_count,
-                "dislikes_count": dislikes_count
-            })
-        else:
-            return JSONResponse({
-                "success": False,
-                "message": "Reaction not found"
-            }, status_code=404)
-        
-    except Exception as e:
-        print(f"Error in delete_reaction: {e}")
-        return JSONResponse(
-            {"error": str(e)}, 
-            status_code=500
-        )
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
