@@ -475,7 +475,8 @@ def update_nav_user_info(nav_frame):
             avatar_label.configure(text="👤", font=("Segoe UI", 16))
         
         
-        if current_user['role'] == 'администратор':
+        # Кнопка "Сёгун" только для главного администратора
+        if is_main_admin():
             create_samurai_button(
                 user_frame, "Сёгун", 
                 developer_window,
@@ -1708,11 +1709,13 @@ def add_manual_quote_to_category(category, refresh_callback):
                     logger.info(f"Создана новая цитата в общей таблице")
             
             
+            # ИЗМЕНЕНИЕ: Добавляем информацию о том, кто добавил цитату
             CategoryQuote.create(
                 category=category.id,
                 quote_type=quote_type,
                 quote_text=quote_text,
-                quote_author=author
+                quote_author=author,
+                added_by=current_user['username']  # Добавляем имя пользователя, который добавил цитату
             )
             
             
@@ -1723,7 +1726,7 @@ def add_manual_quote_to_category(category, refresh_callback):
                 admin_username=current_user['username'],
                 action_type='add_manual_quote_to_category',
                 target_username='System',
-                details=f"Ручное добавление цитаты в категорию {category.name}"
+                details=f"Ручное добавление цитаты в категорию {category.name} пользователем {current_user['username']}"
             )
             
             messagebox.showinfo("Успех", "Цитата добавлена в категорию" + 
@@ -2077,6 +2080,11 @@ def categories_main_window():
                 
                 status_text = " [СКРЫТА]" if category.is_deleted else ""
                 
+                # ИЗМЕНЕНИЕ: Показываем имя создателя категории для главного администратора
+                creator_info = ""
+                if is_main_admin() and hasattr(category, 'created_by') and category.created_by:
+                    creator_info = f" | Создал: {category.created_by}"
+                
                 create_samurai_label(
                     info_frame,
                     f"📁 {category.name}{status_text}",
@@ -2094,7 +2102,7 @@ def categories_main_window():
                 
                 create_samurai_label(
                     info_frame,
-                    f"Цитат: {quotes_count} | Создана: {category.created_at.strftime('%d.%m.%Y')}",
+                    f"Цитат: {quotes_count} | Создана: {category.created_at.strftime('%d.%m.%Y')}{creator_info}",
                     font=FONT_PRIMARY,
                     text_color=SAMURAI_TEXT
                 ).pack(anchor='w', pady=(5, 0))
@@ -2211,16 +2219,18 @@ def add_category_window(refresh_callback):
             return
         
         try:
+            # ИЗМЕНЕНИЕ: Сохраняем информацию о том, кто создал категорию
             Category.create(
                 name=name,
-                description=description
+                description=description,
+                created_by=current_user['username']  # Добавляем имя создателя
             )
             
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='add_category',
                 target_username='System',
-                details=f"Создана категория: {name}"
+                details=f"Создана категория: {name} администратором {current_user['username']}"
             )
             
             messagebox.showinfo("Успех", f"Категория '{name}' создана")
@@ -2311,7 +2321,7 @@ def edit_category_window(category, refresh_callback):
                 admin_username=current_user['username'],
                 action_type='edit_category',
                 target_username='System',
-                details=f"Изменена категория: {name}"
+                details=f"Изменена категория: {name} администратором {current_user['username']}"
             )
             
             messagebox.showinfo("Успех", "Категория обновлена")
@@ -2392,17 +2402,20 @@ def show_category_quotes_window(category):
                     background=SAMURAI_RED,
                     foreground="white")
     
-    columns = ("type", "text", "author")
+    
+    columns = ("type", "text", "author", "added_by")
     tree = ttk.Treeview(tree_frame, columns=columns, show="headings", 
                        style="Category.Treeview", height=20)
     
     tree.heading("type", text="Тип")
     tree.heading("text", text="Цитата")
     tree.heading("author", text="Автор")
+    tree.heading("added_by", text="Добавил")
     
     tree.column("type", width=120, anchor="w", stretch=True)
     tree.column("text", width=500, anchor="w", stretch=True)
     tree.column("author", width=150, anchor="w", stretch=True)
+    tree.column("added_by", width=120, anchor="w", stretch=True)
     
     scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -2430,10 +2443,14 @@ def show_category_quotes_window(category):
             if len(display_text) > 100:
                 display_text = display_text[:100] + "..."
             
+            
+            added_by = rel.added_by if hasattr(rel, 'added_by') and rel.added_by else "Неизвестно"
+            
             tree.insert("", "end", values=(
                 type_labels.get(rel.quote_type, rel.quote_type),
                 display_text,
-                rel.quote_author
+                rel.quote_author,
+                added_by  # Добавляем информацию о том, кто добавил цитату
             ))
         
         if not tree.get_children():
@@ -2646,17 +2663,20 @@ def manage_category_quotes_window(category, refresh_callback):
         tree_frame = create_samurai_frame(table_frame, fg_color=SAMURAI_BG)
         tree_frame.pack(fill='both', expand=True)
         
-        columns = ("type", "text", "author", "added")
+        
+        columns = ("type", "text", "author", "added_by", "added")
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20, selectmode='extended')
         
         tree.heading("type", text="Тип")
         tree.heading("text", text="Цитата")
         tree.heading("author", text="Автор")
+        tree.heading("added_by", text="Добавил")
         tree.heading("added", text="Дата добавления")
         
         tree.column("type", width=100, anchor="w")
-        tree.column("text", width=700, anchor="w")
+        tree.column("text", width=600, anchor="w")
         tree.column("author", width=200, anchor="w")
+        tree.column("added_by", width=120, anchor="w")
         tree.column("added", width=150, anchor="w")
         
         
@@ -2727,10 +2747,14 @@ def manage_category_quotes_window(category, refresh_callback):
                     
                     added_date = rel.added_at.strftime('%d.%m.%Y') if rel.added_at else "—"
                     
+                    # ИЗМЕНЕНИЕ: Показываем имя пользователя, который добавил цитату
+                    added_by = rel.added_by if hasattr(rel, 'added_by') and rel.added_by else "Неизвестно"
+                    
                     tree.insert("", "end", values=(
                         type_labels.get(rel.quote_type, rel.quote_type),
                         display_text,
                         rel.quote_author,
+                        added_by,  # Добавляем информацию о том, кто добавил цитату
                         added_date
                     ), tags=(rel.id,))
             
@@ -3078,11 +3102,13 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
                 pass
             
             
+            
             CategoryQuote.create(
                 category=category.id,
                 quote_type=type_key,
                 quote_text=quote.text,
-                quote_author=quote.author if quote.author else "Неизвестный"
+                quote_author=quote.author if quote.author else "Неизвестный",
+                added_by=current_user['username']  
             )
             added_count += 1
             
@@ -3098,7 +3124,7 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             admin_username=current_user['username'],
             action_type='add_quotes_to_category',
             target_username='System',
-            details=f"Добавлено {added_count} цитат в категорию {category.name}"
+            details=f"Добавлено {added_count} цитат в категорию {category.name} администратором {current_user['username']}"
         )
         
         message = f"✅ Добавлено: {added_count} цитат\n"
@@ -3149,7 +3175,7 @@ def remove_selected_from_category(tree, category, refresh_callback):
                 admin_username=current_user['username'],
                 action_type='remove_quotes_from_category',
                 target_username='System',
-                details=f"Удалено {removed_count} цитат из категории {category.name}"
+                details=f"Удалено {removed_count} цитат из категории {category.name} администратором {current_user['username']}"
             )
             
             messagebox.showinfo("Успех", f"Удалено {removed_count} цитат из категории")
@@ -3181,7 +3207,7 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
                 admin_username=current_user['username'],
                 action_type='remove_all_quotes_from_category',
                 target_username='System',
-                details=f"Удалено {deleted} цитат из категории {category.name}"
+                details=f"Удалено {deleted} цитат из категории {category.name} администратором {current_user['username']}"
             )
             
             messagebox.showinfo("Успех", f"Удалено {deleted} цитат из категории")
@@ -3222,6 +3248,11 @@ def developer_window():
     if not check_auth():
         return
     
+   
+    if not is_main_admin():
+        messagebox.showerror("Ошибка", "Только главный Сёгун имеет доступ к панели управления")
+        return
+    
     dev_win = ctk.CTkToplevel(root)
     dev_win.title("Сёгун - Панель управления")
     dev_win.geometry("900x600")
@@ -3238,20 +3269,19 @@ def developer_window():
     create_samurai_label(main_frame, "Панель Сёгуна", font=FONT_TITLE, text_color=SAMURAI_GOLD).pack(pady=10)
     
     
-    if is_main_admin():
-        content_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_PANEL)
-        content_frame.pack(fill='x', padx=20, pady=10)
-        
-        
-        button_row = create_samurai_frame(content_frame, fg_color="transparent")
-        button_row.pack(pady=10)
-        
-        create_samurai_button(
-            button_row, 
-            "📜 Управление свитками (БД)", 
-            manage_quotes_window,
-            width=200
-        ).pack(side='left', padx=5)
+    content_frame = create_samurai_frame(main_frame, fg_color=SAMURAI_PANEL)
+    content_frame.pack(fill='x', padx=20, pady=10)
+    
+    
+    button_row = create_samurai_frame(content_frame, fg_color="transparent")
+    button_row.pack(pady=10)
+    
+    create_samurai_button(
+        button_row, 
+        "📜 Управление свитками (БД)", 
+        manage_quotes_window,
+        width=200
+    ).pack(side='left', padx=5)
     
     
     tabview = ctk.CTkTabview(
@@ -3264,11 +3294,8 @@ def developer_window():
     )
     tabview.pack(fill='both', expand=True, padx=20, pady=10)
     
-    if is_main_admin():
-        tabview.add("Заявки")
-
-    if is_main_admin():
-        load_requests_tab(tabview.tab("Заявки"))
+    tabview.add("Заявки")
+    load_requests_tab(tabview.tab("Заявки"))
     
     create_samurai_button(main_frame, "Закрыть", dev_win.destroy).pack(pady=10)
 
@@ -3277,12 +3304,8 @@ def load_requests_tab(parent):
     status_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     status_frame.pack(fill='x', pady=5)
     
-    if is_main_admin():
-        create_samurai_label(status_frame, "Статус: Главный Сёгун", 
-                           text_color=SAMURAI_GREEN, font=FONT_BOLD).pack(side='left')
-    else:
-        create_samurai_label(status_frame, "Статус: Сёгун", 
-                           text_color=SAMURAI_GOLD, font=FONT_BOLD).pack(side='left')
+    create_samurai_label(status_frame, "Статус: Главный Сёгун", 
+                       text_color=SAMURAI_GREEN, font=FONT_BOLD).pack(side='left')
     
     user_token = get_current_user_token()
     if user_token:

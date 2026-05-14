@@ -1,9 +1,3 @@
-# categories_improved.py
-"""
-Улучшенное распределение цитат по категориям
-Каждая цитата попадает ТОЛЬКО в ОДНУ категорию
-Без дублирования и повторений
-"""
 
 from connect import (
     db, Category, CategoryQuote,
@@ -19,7 +13,7 @@ logger = logging.getLogger(__name__)
 def create_categories():
     """Создание категорий с чёткими границами"""
     categories_data = [
-        # Мотивационные категории (7)
+
         {
             "name": "Успех и достижения",
             "description": "Цитаты о достижении целей, успехе, победах и реализации потенциала",
@@ -93,7 +87,7 @@ def create_categories():
             "type": "affirmation"
         },
         
-        # Юмористические категории (7)
+        
         {
             "name": "Жизненная ирония",
             "description": "Смешные и ироничные наблюдения о жизни и её парадоксах",
@@ -161,13 +155,13 @@ class QuoteCategorizer:
         text = quote.text.lower()
         author = quote.author.lower() if quote.author else ""
         
-        # Проверка на дублирование
+    
         quote_key = (quote.text, 'motivation')
         if quote_key in self.used_quotes:
             return None
         self.used_quotes.add(quote_key)
         
-        # Приоритетные правила для известных авторов
+        
         author_mapping = {
             "стив джобс": ["Успех и достижения", "Саморазвитие и рост"],
             "уинстон черчилль": ["Успех и достижения", "Преодоление трудностей"],
@@ -182,10 +176,10 @@ class QuoteCategorizer:
         }
         
         if author in author_mapping:
-            # Выбираем первую категорию из списка для автора
+
             return self.categories.get(author_mapping[author][0])
         
-        # Ключевые слова с весами для каждой категории
+    
         category_keywords = {
             "Успех и достижения": {
                 "keywords": ["успех", "достичь", "достигать", "цель", "победа", "великие дела", 
@@ -224,7 +218,7 @@ class QuoteCategorizer:
             }
         }
         
-        # Подсчёт баллов
+        
         scores = {}
         for cat_name, data in category_keywords.items():
             score = sum(1 for kw in data["keywords"] if kw in text) * data["weight"]
@@ -232,11 +226,10 @@ class QuoteCategorizer:
                 scores[cat_name] = score
         
         if scores:
-            # Выбираем категорию с максимальным баллом
             best_category = max(scores, key=scores.get)
             return self.categories.get(best_category)
         
-        # Категория по умолчанию на основе содержания
+
         if "жизнь" in text or "судьба" in text:
             return self.categories.get("Мудрость жизни")
         elif "успех" in text or "достиж" in text:
@@ -248,13 +241,12 @@ class QuoteCategorizer:
         """Определить ОДНУ категорию для аффирмации"""
         text = quote.text.lower()
         
-        # Проверка на дублирование
+        
         quote_key = (quote.text, 'affirmation')
         if quote_key in self.used_quotes:
             return None
         self.used_quotes.add(quote_key)
         
-        # Ключевые слова для каждой категории
         category_keywords = {
             "Любовь к себе": ["любовь", "достоин", "уважение", "принимаю", "себя", "ценю", 
                             "уникальн", "талант", "принимать"],
@@ -282,7 +274,6 @@ class QuoteCategorizer:
             best_category = max(scores, key=scores.get)
             return self.categories.get(best_category)
         
-        # Умолчания на основе паттернов
         if re.search(r'я\s+(могу|способ)', text):
             return self.categories.get("Уверенность и сила")
         elif "благодар" in text:
@@ -297,7 +288,7 @@ class QuoteCategorizer:
         text = quote.text.lower()
         author = quote.author.lower() if quote.author else ""
         
-        # Проверка на дублирование
+
         quote_key = (quote.text, 'funny')
         if quote_key in self.used_quotes:
             return None
@@ -307,7 +298,7 @@ class QuoteCategorizer:
         if author in ["марк твен", "фаина раневская", "вудди аллен", "джером к. джером"]:
             return self.categories.get("Остроумные наблюдения")
         
-        # Ключевые слова
+        
         category_keywords = {
             "Жизненная ирония": ["жизнь", "ирония", "парадокс", "странно", "логика", 
                                "справедлив", "вселенная", "судьба"],
@@ -364,7 +355,7 @@ def distribute_all_quotes():
         deleted = CategoryQuote.delete().execute()
         print(f"✅ Удалено старых связей: {deleted}")
         
-        # Создаём категоризатор
+        
         categorizer = QuoteCategorizer(categories)
         
         stats = {
@@ -373,7 +364,7 @@ def distribute_all_quotes():
             'funny': {'total': 0, 'distributed': 0}
         }
         
-        # Распределяем мотивационные цитаты
+        
         print("\n📊 Распределение мотивационных цитат...")
         motivations = Motivation.select().where(Motivation.is_deleted == False)
         stats['motivation']['total'] = motivations.count()
@@ -391,7 +382,7 @@ def distribute_all_quotes():
         
         print(f"   Распределено: {stats['motivation']['distributed']}/{stats['motivation']['total']}")
         
-        # Распределяем аффирмации
+        
         print("\n📊 Распределение аффирмаций...")
         affirmations = Affirmation.select().where(Affirmation.is_deleted == False)
         stats['affirmation']['total'] = affirmations.count()
@@ -409,7 +400,7 @@ def distribute_all_quotes():
         
         print(f"   Распределено: {stats['affirmation']['distributed']}/{stats['affirmation']['total']}")
         
-        # Распределяем юмористические цитаты
+
         print("\n📊 Распределение юмористических цитат...")
         funny = FunnyQuote.select().where(FunnyQuote.is_deleted == False)
         stats['funny']['total'] = funny.count()
@@ -427,7 +418,7 @@ def distribute_all_quotes():
         
         print(f"   Распределено: {stats['funny']['distributed']}/{stats['funny']['total']}")
         
-        # Показываем итоговую статистику
+        
         show_final_statistics(categories, stats)
         
         print("\n✨ Распределение завершено успешно!")
@@ -485,7 +476,7 @@ def show_final_statistics(categories, stats):
             if fun > 0:
                 print(f"   └─ Юмор: {fun}")
     
-    # Общая статистика
+    
     print("\n" + "="*70)
     print("📈 ОБЩАЯ СТАТИСТИКА:")
     print("-" * 50)
@@ -501,7 +492,7 @@ def show_final_statistics(categories, stats):
     print(f"\nРаспределено по категориям: {total_distributed}/{total_all}")
     print(f"Охват: {(total_distributed/total_all*100):.1f}%")
     
-    # Проверка на дублирование
+    
     print("\n🔍 ПРОВЕРКА НА ДУБЛИРОВАНИЕ:")
     print("-" * 50)
     
@@ -516,7 +507,7 @@ def show_final_statistics(categories, stats):
         duplicates = len(quote_keys) - len(unique_keys)
         print(f"⚠️ Найдено дубликатов: {duplicates}")
         
-        # Показываем примеры дубликатов
+       
         from collections import Counter
         counter = Counter(quote_keys)
         dup_examples = [(k, v) for k, v in counter.items() if v > 1][:5]

@@ -25,11 +25,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 AVATARS_DIR = Path("static/avatars")
 AVATARS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Секретный ключ для сессий
+
 SECRET_KEY = "your-secret-key-here-change-in-production"
 SESSION_COOKIE_NAME = "session_id"
 
-# Хранилище сессий
+
 sessions = {}
 
 def create_session(username: str) -> str:
@@ -99,7 +99,7 @@ def quote_to_dict(quote, quote_type):
     }
 
 
-# ========== ЭНДПОИНТЫ АВТОРИЗАЦИИ ==========
+
 
 @app.post('/api/auth/register')
 async def register(request: Request):
@@ -110,7 +110,7 @@ async def register(request: Request):
         password = data.get('password', '')
         nickname = data.get('nickname', '').strip()
 
-        # Валидация
+        
         if not username or not password:
             return JSONResponse(
                 {"success": False, "message": "Имя пользователя и пароль обязательны"},
@@ -207,10 +207,10 @@ async def login(request: Request):
                 status_code=401
             )
 
-        # Создаем сессию
+        
         session_id = create_session(username)
         
-        # Устанавливаем cookie
+        
         response = JSONResponse({
             "success": True,
             "message": "Вход выполнен успешно",
@@ -278,7 +278,7 @@ async def get_current_user_api(request: Request):
     return JSONResponse({"is_authenticated": False})
 
 
-# ========== API ДЛЯ ПРОФИЛЯ ==========
+
 
 @app.post('/api/profile/update')
 async def update_profile(request: Request):
@@ -295,7 +295,7 @@ async def update_profile(request: Request):
         nickname = data.get('nickname', '').strip()
         new_password = data.get('new_password', '')
         
-        # Обновляем профиль
+        
         user_profile = UserProfile.get_or_none(UserProfile.username == session_user["username"])
         if user_profile:
             if nickname:
@@ -341,19 +341,19 @@ async def upload_avatar(request: Request, file: UploadFile = File(...)):
                 status_code=400
             )
         
-        # Генерируем имя файла
+        
         file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
         avatar_filename = f"{session_user['username']}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{file_extension}"
         avatar_path = AVATARS_DIR / avatar_filename
         
-        # Сохраняем файл
+        
         with open(avatar_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Обновляем путь в базе данных
+        
         user_profile = UserProfile.get_or_none(UserProfile.username == session_user["username"])
         if user_profile:
-            # Удаляем старый аватар если есть
+            
             if user_profile.avatar_path:
                 old_avatar = Path("static") / user_profile.avatar_path.lstrip('/')
                 if old_avatar.exists():
@@ -418,7 +418,7 @@ async def delete_avatar(request: Request):
         )
 
 
-# ========== API ДЛЯ РЕЙТИНГА ==========
+
 
 @app.post('/api/rating')
 async def add_rating(request: Request):
@@ -452,14 +452,14 @@ async def add_rating(request: Request):
             )
         
         with db.atomic():
-            # Получаем или создаем запись рейтинга
+            
             rating_record, created = QuoteRating.get_or_create(
                 quote_id=quote_id,
                 quote_type=quote_type,
                 defaults={'total_rating': 0, 'votes_count': 0, 'average_rating': 0}
             )
             
-            # Проверяем, голосовал ли пользователь ранее
+            
             try:
                 user_rating = UserQuoteRating.get(
                     (UserQuoteRating.username == username) &
@@ -477,7 +477,7 @@ async def add_rating(request: Request):
                 message = f"Оценка обновлена с {old_rating}★ на {rating}★"
                 
             except UserQuoteRating.DoesNotExist:
-                # Новая оценка
+                
                 rating_record.total_rating += rating
                 rating_record.votes_count += 1
                 
@@ -490,7 +490,7 @@ async def add_rating(request: Request):
                 
                 message = f"Оценка {rating}★ добавлена!"
             
-            # Пересчитываем средний рейтинг
+            
             if rating_record.votes_count > 0:
                 rating_record.average_rating = rating_record.total_rating / rating_record.votes_count
             rating_record.updated_at = datetime.now()
@@ -731,7 +731,7 @@ async def get_reactions_count(
         )
 
 
-# ========== СТРАНИЦЫ HTML ==========
+
 
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request, q: Optional[str] = None):
@@ -776,7 +776,7 @@ async def global_search(request: Request, q: str = Query(..., min_length=1)):
         'type': 'Аффирмация'
     } for i in aff]
     
-    # Поиск в смешных цитатах
+    
     fun = FunnyQuote.select().where(
         (FunnyQuote.text.contains(q)) | (FunnyQuote.author.contains(q))
     )
@@ -787,7 +787,7 @@ async def global_search(request: Request, q: str = Query(..., min_length=1)):
         'type': 'Юмор'
     } for i in fun]
     
-    # Поиск в категориях
+    
     cat = Category.select().where(
         (Category.name.contains(q)) | (Category.description.contains(q))
     )
@@ -836,7 +836,7 @@ async def motivation(
     # Получаем все цитаты
     mot = list(query)
     
-    # Сортировка
+    
     if sort and sort.startswith('rating_'):
         # Добавляем рейтинг к каждой цитате
         for quote in mot:
@@ -914,10 +914,10 @@ async def affirmation(
     all_authors = list(set([a.author for a in Affirmation.select().where(Affirmation.is_deleted == False) if a.author]))
     all_authors.sort()
     
-    # Получаем все цитаты
+    
     aff = list(query)
     
-    # Сортировка
+
     if sort and sort.startswith('rating_'):
         for quote in aff:
             rating = QuoteRating.get_or_none(
@@ -994,10 +994,10 @@ async def funny(
     all_authors = list(set([f.author for f in FunnyQuote.select().where(FunnyQuote.is_deleted == False) if f.author]))
     all_authors.sort()
     
-    # Получаем все цитаты
+    
     fun = list(query)
     
-    # Сортировка
+    
     if sort and sort.startswith('rating_'):
         for quote in fun:
             rating = QuoteRating.get_or_none(
@@ -1236,7 +1236,7 @@ async def profile(request: Request):
         'created_at': i.created_at
      } for i in prof]
     
-    # Получаем историю реакций пользователя
+    
     user_reactions = UserReaction.select().where(
         UserReaction.username == current_user["username"]
     ).order_by(UserReaction.created_at.desc()).limit(10)

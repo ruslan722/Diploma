@@ -46,7 +46,7 @@ class AdminRequests(BaseModel):
     admin_token = TextField(null=True)
 
 
-# --- ТАБЛИЦЫ ДЛЯ РЕАКЦИЙ И ПРОФИЛЕЙ ---
+
 
 class UserReaction(BaseModel):
     username = CharField()
@@ -74,12 +74,13 @@ class AdminActionLog(BaseModel):
     created_at = DateTimeField(default=datetime.datetime.now)
 
 
-# --- ТАБЛИЦЫ ДЛЯ КАТЕГОРИЙ ---
+
 
 class Category(BaseModel):
     """Категория для группировки цитат"""
     name = CharField(unique=True, max_length=100)
     description = TextField(null=True)
+    created_by = CharField(null=True)  
     created_at = DateTimeField(default=datetime.datetime.now)
     is_deleted = BooleanField(default=False)
     
@@ -92,6 +93,7 @@ class CategoryQuote(BaseModel):
     quote_type = CharField(max_length=20)
     quote_text = TextField()
     quote_author = CharField(max_length=200)
+    added_by = CharField(null=True)  
     added_at = DateTimeField(default=datetime.datetime.now)
     
     class Meta:
@@ -101,7 +103,7 @@ class CategoryQuote(BaseModel):
         )
 
 
-# --- ТАБЛИЦЫ ДЛЯ РЕЙТИНГА ---
+
 
 class QuoteRating(BaseModel):
     """Рейтинг цитаты (1-5 звезд)"""
@@ -137,7 +139,7 @@ class UserQuoteRating(BaseModel):
 def init_db():
     db.connect()
     
-    # Создаем все таблицы
+
     db.create_tables([
         Motivation,
         Affirmation,
@@ -153,7 +155,7 @@ def init_db():
         UserQuoteRating
     ], safe=True)
     
-    # Создание админа
+    
     def hash_password(password):
         import hashlib
         return hashlib.sha256(password.encode()).hexdigest()
