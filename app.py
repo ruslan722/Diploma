@@ -475,7 +475,7 @@ def update_nav_user_info(nav_frame):
             avatar_label.configure(text="👤", font=("Segoe UI", 16))
         
         
-        # Кнопка "Сёгун" только для главного администратора
+        
         if is_main_admin():
             create_samurai_button(
                 user_frame, "Сёгун", 
@@ -993,7 +993,6 @@ def show_profile_settings():
                          color=SAMURAI_PANEL, hover_color="#333").pack(side='left', padx=10)
 
 
-# ========== КЛАСС ДЛЯ РЕЙТИНГА ==========
 
 class RatingManager:
     """Менеджер для работы с рейтингами цитат"""
@@ -1058,7 +1057,7 @@ class RatingManager:
             return []
 
 
-# ========== ВИДЖЕТ ДЛЯ ОТОБРАЖЕНИЯ РЕЙТИНГА С ЧАСТИЧНЫМ ЗАПОЛНЕНИЕМ ЗВЕЗД ==========
+
 
 class RatingDisplayWidget(ctk.CTkFrame):
     """Виджет для отображения рейтинга звездами с частичным заполнением (как на HDRezka)"""
@@ -1072,26 +1071,26 @@ class RatingDisplayWidget(ctk.CTkFrame):
         avg = self.rating_info.get('average', 0)
         votes = self.rating_info.get('votes', 0)
         
-        # Отображаем звезды с частичным заполнением
+       
         stars_frame = ctk.CTkFrame(self, fg_color="transparent")
         stars_frame.pack(side='left', padx=5)
         
-        # Создаем 5 звезд с частичным заполнением
+        
         star_size = 20
         star_padding = 2
         
         for i in range(5):
             star_number = i + 1
             
-            # Вычисляем процент заполнения для текущей звезды (0.0 до 1.0)
-            if avg >= star_number:
-                fill_percent = 1.0  # Полностью заполнена
-            elif avg > star_number - 1:
-                fill_percent = avg - (star_number - 1)  # Частично заполнена
-            else:
-                fill_percent = 0.0  # Пустая
             
-            # Создаем canvas для одной звезды
+            if avg >= star_number:
+                fill_percent = 1.0
+            elif avg > star_number - 1:
+                fill_percent = avg - (star_number - 1)
+            else:
+                fill_percent = 0.0
+            
+            
             star_canvas = tk.Canvas(
                 stars_frame, 
                 width=star_size + star_padding * 2, 
@@ -1101,10 +1100,10 @@ class RatingDisplayWidget(ctk.CTkFrame):
             )
             star_canvas.pack(side='left', padx=0)
             
-            # Рисуем звезду с частичным заполнением
+            
             self.draw_partial_star(star_canvas, star_size, star_padding, fill_percent)
         
-        # Числовое значение и количество голосов
+        
         info_frame = ctk.CTkFrame(self, fg_color="transparent")
         info_frame.pack(side='left', padx=10)
         
@@ -1128,7 +1127,7 @@ class RatingDisplayWidget(ctk.CTkFrame):
         cy = size / 2 + padding
         r = size / 2 - 1
         
-        # Вычисляем точки звезды
+        
         points = []
         for i in range(10):
             angle = math.pi / 2 - i * math.pi / 5
@@ -1141,34 +1140,33 @@ class RatingDisplayWidget(ctk.CTkFrame):
             y = cy - radius * math.sin(angle)
             points.extend([x, y])
         
-        # Рисуем контур звезды (пустая звезда)
+        
         canvas.create_polygon(points, fill=SAMURAI_BG, outline=SAMURAI_TEXT_SECONDARY, width=1)
         
         if fill_percent > 0:
-            # Создаем маску для частичного заполнения
+            
             clip_width = int((size + padding * 2) * fill_percent)
             
-            # Рисуем заполненную часть звезды золотым цветом
+            
             if fill_percent >= 1.0:
-                # Полностью заполненная звезда
+                
                 canvas.create_polygon(points, fill=SAMURAI_GOLD, outline=SAMURAI_GOLD)
             else:
-                # Частично заполненная звезда
-                # Сначала рисуем золотую звезду
+                
                 star_id = canvas.create_polygon(points, fill=SAMURAI_GOLD, outline=SAMURAI_GOLD)
                 
-                # Затем рисуем прямоугольник фона, который обрезает звезду справа
+                
                 clip_id = canvas.create_rectangle(
                     clip_width, 0, 
                     size + padding * 2 + 10, size + padding * 2 + 10,
                     fill=SAMURAI_BG, outline=''
                 )
                 
-                # Поднимаем обрезающий прямоугольник над звездой
+                
                 canvas.tag_raise(clip_id, star_id)
 
 
-# ========== ФУНКЦИИ ДЛЯ ОТОБРАЖЕНИЯ ТОПА ==========
+
 
 def show_top_quotes_window(rating_manager, quote_filter=None):
     """Показать окно с топ-цитатами"""
@@ -1396,7 +1394,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
     content_frame = ctk.CTkFrame(root, fg_color=SAMURAI_BG)
     content_frame.pack(fill='both', expand=True)
     
-    # Кнопка для просмотра топа
+    
     top_btn_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
     top_btn_frame.pack(fill='x', padx=20, pady=10)
     
@@ -1453,7 +1451,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
         author_label = create_samurai_label(quote_text_frame, text="", font=FONT_PRIMARY, text_color=SAMURAI_GOLD)
         author_label.pack(pady=(20, 0))
         
-        # Фрейм для отображения рейтинга
+        
         rating_frame = ctk.CTkFrame(quote_card, fg_color="transparent")
         rating_frame.pack(fill='x', padx=20, pady=10)
         
@@ -1470,7 +1468,7 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
                 return
             quote = quotes[current_quote_index]
             
-            # Получаем данные о рейтинге из БД (средняя оценка всех пользователей)
+            
             try:
                 rating = QuoteRating.get_or_none(
                     (QuoteRating.quote_id == quote.id) & 
@@ -1486,11 +1484,11 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
             except:
                 rating_info = {'average': 0, 'votes': 0}
             
-            # Очищаем фрейм рейтинга
+            
             for w in rating_frame.winfo_children():
                 w.destroy()
             
-            # Отображаем виджет с частично заполненными звездами
+            
             RatingDisplayWidget(rating_frame, rating_info).pack(pady=5)
         
         def update_likes_count():
@@ -1709,13 +1707,13 @@ def add_manual_quote_to_category(category, refresh_callback):
                     logger.info(f"Создана новая цитата в общей таблице")
             
             
-            # ИЗМЕНЕНИЕ: Добавляем информацию о том, кто добавил цитату
+            
             CategoryQuote.create(
                 category=category.id,
                 quote_type=quote_type,
                 quote_text=quote_text,
                 quote_author=author,
-                added_by=current_user['username']  # Добавляем имя пользователя, который добавил цитату
+                added_by=current_user['username']
             )
             
             
@@ -2013,11 +2011,11 @@ def categories_main_window():
     categories_container.pack(fill='both', expand=True)
     
     def load_categories():
-        # Полная очистка контейнера перед загрузкой
+        
         for widget in categories_container.winfo_children():
             widget.destroy()
         
-        # Принудительное обновление интерфейса
+        
         categories_container.update_idletasks()
         
         try:
@@ -2080,7 +2078,7 @@ def categories_main_window():
                 
                 status_text = " [СКРЫТА]" if category.is_deleted else ""
                 
-                # ИЗМЕНЕНИЕ: Показываем имя создателя категории для главного администратора
+                
                 creator_info = ""
                 if is_main_admin() and hasattr(category, 'created_by') and category.created_by:
                     creator_info = f" | Создал: {category.created_by}"
@@ -2219,11 +2217,11 @@ def add_category_window(refresh_callback):
             return
         
         try:
-            # ИЗМЕНЕНИЕ: Сохраняем информацию о том, кто создал категорию
+            
             Category.create(
                 name=name,
                 description=description,
-                created_by=current_user['username']  # Добавляем имя создателя
+                created_by=current_user['username']
             )
             
             AdminActionLog.create(
@@ -2450,7 +2448,7 @@ def show_category_quotes_window(category):
                 type_labels.get(rel.quote_type, rel.quote_type),
                 display_text,
                 rel.quote_author,
-                added_by  # Добавляем информацию о том, кто добавил цитату
+                added_by
             ))
         
         if not tree.get_children():
@@ -2747,14 +2745,14 @@ def manage_category_quotes_window(category, refresh_callback):
                     
                     added_date = rel.added_at.strftime('%d.%m.%Y') if rel.added_at else "—"
                     
-                    # ИЗМЕНЕНИЕ: Показываем имя пользователя, который добавил цитату
+                    
                     added_by = rel.added_by if hasattr(rel, 'added_by') and rel.added_by else "Неизвестно"
                     
                     tree.insert("", "end", values=(
                         type_labels.get(rel.quote_type, rel.quote_type),
                         display_text,
                         rel.quote_author,
-                        added_by,  # Добавляем информацию о том, кто добавил цитату
+                        added_by,
                         added_date
                     ), tags=(rel.id,))
             
