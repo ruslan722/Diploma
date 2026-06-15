@@ -16,7 +16,8 @@ from datetime import datetime
 from connect import (
     Avtorization, Motivation, Affirmation, FunnyQuote,
     AdminRequests, UserReaction, UserProfile, AdminActionLog, init_db,
-    Category, CategoryQuote, QuoteRating, UserQuoteRating
+    Category, CategoryQuote, QuoteRating, UserQuoteRating,
+    sync_categories_to_file, sync_quotes_to_categories_file, check_quote_in_any_category
 )
 
 
@@ -1059,6 +1060,7 @@ class RatingManager:
 
 
 
+
 class RatingDisplayWidget(ctk.CTkFrame):
     """Виджет для отображения рейтинга звездами с частичным заполнением (как на HDRezka)"""
     
@@ -1164,6 +1166,7 @@ class RatingDisplayWidget(ctk.CTkFrame):
                 
                 
                 canvas.tag_raise(clip_id, star_id)
+
 
 
 
@@ -1602,7 +1605,6 @@ def add_manual_quote_to_category(category, refresh_callback):
     add_win.transient(root)
     add_win.grab_set()
     
-    
     set_fullscreen(add_win)
     
     main_frame = create_samurai_frame(add_win, fg_color=SAMURAI_BG)
@@ -1674,7 +1676,7 @@ def add_manual_quote_to_category(category, refresh_callback):
                 author = "Неизвестный"
         
         try:
-            
+            # Проверяем, не существует ли уже такая цитата в этой категории
             existing = CategoryQuote.select().where(
                 (CategoryQuote.category == category.id) &
                 (CategoryQuote.quote_text == quote_text)
@@ -1684,6 +1686,11 @@ def add_manual_quote_to_category(category, refresh_callback):
                 messagebox.showerror("Ошибка", "Такая цитата уже есть в этой категории")
                 return
             
+            # Проверяем, не находится ли цитата уже в другой категории
+            is_in_other_category, other_cat_name = check_quote_in_any_category(quote_text, quote_type, category.id)
+            if is_in_other_category:
+                messagebox.showerror("Ошибка", f"Эта цитата уже находится в категории '{other_cat_name}'\nОдна цитата не может быть в двух категориях!")
+                return
             
             if add_to_main:
                 models = {
@@ -1693,21 +1700,17 @@ def add_manual_quote_to_category(category, refresh_callback):
                 }
                 model = models[quote_type]
                 
-                
                 try:
                     existing_main = model.get(model.text == quote_text)
-                    
                     logger.info(f"Цитата уже существует в общей таблице, ID: {existing_main.id}")
                 except model.DoesNotExist:
-                    
                     model.create(
                         text=quote_text,
                         author=author
                     )
                     logger.info(f"Создана новая цитата в общей таблице")
             
-            
-            
+            # Создаем связь категория-цитата
             CategoryQuote.create(
                 category=category.id,
                 quote_type=quote_type,
@@ -1716,9 +1719,8 @@ def add_manual_quote_to_category(category, refresh_callback):
                 added_by=current_user['username']
             )
             
-            
             update_parser_file()
-            
+            sync_quotes_to_categories_file()
             
             AdminActionLog.create(
                 admin_username=current_user['username'],
@@ -1727,10 +1729,15 @@ def add_manual_quote_to_category(category, refresh_callback):
                 details=f"Ручное добавление цитаты в категорию {category.name} пользователем {current_user['username']}"
             )
             
-            messagebox.showinfo("Успех", "Цитата добавлена в категорию" + 
+            messagebox.showinfo("Успех", "Цитата добавлена в категорию и сохранена в categories.py" + 
                               (" и в общую таблицу" if add_to_main else ""))
+            
+            # Закрываем окно ДО вызова refresh_callback
             add_win.destroy()
-            refresh_callback()  
+            
+            # Вызываем refresh_callback с задержкой, чтобы окно успело закрыться
+            if refresh_callback:
+                root.after(100, refresh_callback)
             
         except Exception as e:
             logger.error(f"Ошибка ручного добавления цитаты: {e}")
@@ -1778,7 +1785,10 @@ def hard_delete_category(category, refresh_callback):
             
             category_id = category.id
             category_name = category.name
-            category.delete_instance()  
+            category.delete_instance()
+            
+            
+            sync_categories_to_file()
             
             
             AdminActionLog.create(
@@ -1791,7 +1801,7 @@ def hard_delete_category(category, refresh_callback):
             messagebox.showinfo("Успех", 
                               f"Категория '{category_name}' полностью удалена из БД\n"
                               f"Удалено цитат из категории: {deleted_quotes}")
-            refresh_callback()  
+            refresh_callback()
             
         except Exception as e:
             logger.error(f"Ошибка полного удаления категории: {e}")
@@ -1821,6 +1831,9 @@ def soft_delete_category(category, refresh_callback):
             category.save()
             
             
+            sync_categories_to_file()
+            
+            
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='soft_delete_category',
@@ -1829,7 +1842,7 @@ def soft_delete_category(category, refresh_callback):
             )
             
             messagebox.showinfo("Успех", f"Категория '{category.name}' скрыта")
-            refresh_callback()  
+            refresh_callback()
             
         except Exception as e:
             logger.error(f"Ошибка скрытия категории: {e}")
@@ -1847,6 +1860,9 @@ def restore_category(category, refresh_callback):
             category.is_deleted = False
             category.save()
             
+            
+            sync_categories_to_file()
+            
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='restore_category',
@@ -1854,12 +1870,25 @@ def restore_category(category, refresh_callback):
                 details=f"Восстановлена категория: {category.name}"
             )
             
-            messagebox.showinfo("Успех", f"Категория '{category.name}' восстановлена")
+            messagebox.showinfo("Успех", f"Категория '{category.name}' восстановлена и синхронизирована")
             refresh_callback()
             
         except Exception as e:
             logger.error(f"Ошибка восстановления категории: {e}")
             messagebox.showerror("Ошибка", f"Не удалось восстановить категорию: {str(e)}")
+
+
+def sync_all_to_file():
+    """Синхронизирует все категории и цитаты с файлом categories.py"""
+    try:
+        sync_categories_to_file()
+        sync_quotes_to_categories_file()
+        messagebox.showinfo("Успех", "Все категории и цитаты синхронизированы с categories.py")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка синхронизации: {e}")
+        messagebox.showerror("Ошибка", f"Не удалось синхронизировать: {str(e)}")
+        return False
 
 
 def categories_main_window():
@@ -1905,6 +1934,16 @@ def categories_main_window():
             width=180
         )
         add_btn.pack(side='right', padx=10)
+        
+        sync_btn = create_samurai_button(
+            header_frame,
+            "🔄 Синхронизировать с файлом",
+            sync_all_to_file,
+            color=SAMURAI_GOLD,
+            hover_color=SAMURAI_GOLD_HOVER,
+            width=200
+        )
+        sync_btn.pack(side='right', padx=10)
     
     
     filter_frame = create_samurai_frame(main_container, fg_color=SAMURAI_PANEL)
@@ -2224,6 +2263,9 @@ def add_category_window(refresh_callback):
                 created_by=current_user['username']
             )
             
+            
+            sync_categories_to_file()
+            
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='add_category',
@@ -2231,9 +2273,9 @@ def add_category_window(refresh_callback):
                 details=f"Создана категория: {name} администратором {current_user['username']}"
             )
             
-            messagebox.showinfo("Успех", f"Категория '{name}' создана")
+            messagebox.showinfo("Успех", f"Категория '{name}' создана и сохранена в categories.py")
             add_win.destroy()
-            refresh_callback()  
+            refresh_callback()
             
         except Exception as e:
             if "Duplicate entry" in str(e):
@@ -2311,18 +2353,22 @@ def edit_category_window(category, refresh_callback):
             return
         
         try:
+            old_name = category.name
             category.name = name
             category.description = description
             category.save()
+            
+            
+            sync_categories_to_file()
             
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='edit_category',
                 target_username='System',
-                details=f"Изменена категория: {name} администратором {current_user['username']}"
+                details=f"Изменена категория: {old_name} -> {name} администратором {current_user['username']}"
             )
             
-            messagebox.showinfo("Успех", "Категория обновлена")
+            messagebox.showinfo("Успех", "Категория обновлена и сохранена в categories.py")
             edit_win.destroy()
             refresh_callback()
             
@@ -3118,6 +3164,10 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             errors.append(str(e))
     
     if added_count > 0:
+        
+        
+        sync_quotes_to_categories_file()
+        
         AdminActionLog.create(
             admin_username=current_user['username'],
             action_type='add_quotes_to_category',
@@ -3169,6 +3219,9 @@ def remove_selected_from_category(tree, category, refresh_callback):
                 logger.error(f"Ошибка удаления из категории: {e}")
         
         if removed_count > 0:
+            
+            sync_quotes_to_categories_file()
+            
             AdminActionLog.create(
                 admin_username=current_user['username'],
                 action_type='remove_quotes_from_category',
@@ -3200,6 +3253,8 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
             
             deleted = CategoryQuote.delete().where(CategoryQuote.category == category.id).execute()
             
+            
+            sync_quotes_to_categories_file()
             
             AdminActionLog.create(
                 admin_username=current_user['username'],
