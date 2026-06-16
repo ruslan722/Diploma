@@ -22,7 +22,7 @@ class BaseModel(Model):
 class Motivation(BaseModel):
     text = CharField(max_length=512, unique=True)
     author = CharField()
-    is_deleted = BooleanField(default=False)  
+    is_deleted = BooleanField(default=False)
 
 class Affirmation(BaseModel):
     text = CharField(max_length=512, unique=True)
@@ -73,10 +73,9 @@ class AdminActionLog(BaseModel):
     created_at = DateTimeField(default=datetime.datetime.now)
 
 class Category(BaseModel):
-    """Категория для группировки цитат"""
     name = CharField(unique=True, max_length=100)
     description = TextField(null=True)
-    created_by = CharField(null=True)  
+    created_by = CharField(null=True)
     created_at = DateTimeField(default=datetime.datetime.now)
     is_deleted = BooleanField(default=False)
     
@@ -84,24 +83,20 @@ class Category(BaseModel):
         table_name = 'categories'
 
 class CategoryQuote(BaseModel):
-    """Связь цитаты с категорией"""
     category = ForeignKeyField(Category, backref='quotes', on_delete='CASCADE')
     quote_type = CharField(max_length=20)
     quote_text = TextField()
     quote_author = CharField(max_length=200)
-    added_by = CharField(null=True)  
+    added_by = CharField(null=True)
     added_at = DateTimeField(default=datetime.datetime.now)
     
     class Meta:
         table_name = 'category_quotes'
         indexes = (
-            # Убираем уникальный индекс на TEXT поле - он вызывает ошибку в MySQL
-            # Вместо этого будем проверять уникальность в коде
             (('category', 'quote_type'), False),
         )
 
 class QuoteRating(BaseModel):
-    """Рейтинг цитаты (1-5 звезд)"""
     quote_id = IntegerField()
     quote_type = CharField(max_length=20)
     total_rating = IntegerField(default=0)
@@ -116,7 +111,6 @@ class QuoteRating(BaseModel):
         )
 
 class UserQuoteRating(BaseModel):
-    """Оценка пользователя для конкретной цитаты"""
     username = CharField()
     quote_id = IntegerField()
     quote_type = CharField(max_length=20)
@@ -132,11 +126,9 @@ class UserQuoteRating(BaseModel):
 
 
 def cleanup_duplicate_category_quotes():
-    """Удаляет дубликаты цитат в категориях из БД"""
     try:
         db.connect()
         
-        # Находим дубликаты
         from peewee import fn
         
         duplicates = (CategoryQuote
@@ -146,14 +138,12 @@ def cleanup_duplicate_category_quotes():
         
         deleted_count = 0
         for dup in duplicates:
-            # Находим все дубликаты для этой комбинации
             dup_quotes = CategoryQuote.select().where(
                 (CategoryQuote.category == dup.category) &
                 (CategoryQuote.quote_text == dup.quote_text) &
                 (CategoryQuote.quote_type == dup.quote_type)
             ).order_by(CategoryQuote.id)
             
-            # Оставляем первый, удаляем остальные
             first = True
             for quote in dup_quotes:
                 if not first:
@@ -161,20 +151,17 @@ def cleanup_duplicate_category_quotes():
                     deleted_count += 1
                 first = False
         
-        # Также проверяем дубликаты по тексту и типу (в разных категориях)
         text_duplicates = (CategoryQuote
                           .select(CategoryQuote.quote_text, CategoryQuote.quote_type, fn.COUNT(CategoryQuote.id).alias('count'))
                           .group_by(CategoryQuote.quote_text, CategoryQuote.quote_type)
                           .having(fn.COUNT(CategoryQuote.id) > 1))
         
         for dup in text_duplicates:
-            # Находим все дубликаты этой цитаты
             dup_quotes = CategoryQuote.select().where(
                 (CategoryQuote.quote_text == dup.quote_text) &
                 (CategoryQuote.quote_type == dup.quote_type)
             ).order_by(CategoryQuote.id)
             
-            # Оставляем первый, удаляем остальные
             first = True
             for quote in dup_quotes:
                 if not first:
@@ -195,13 +182,11 @@ def cleanup_duplicate_category_quotes():
 
 
 def sync_categories_to_file():
-    """Синхронизирует категории из БД в файл categories.py"""
     try:
         categories = Category.select().where(Category.is_deleted == False)
         
         categories_data = []
         for cat in categories:
-            # Определяем тип категории по цитатам в ней
             quotes = CategoryQuote.select().where(CategoryQuote.category == cat.id)
             mot_count = sum(1 for q in quotes if q.quote_type == 'motivation')
             aff_count = sum(1 for q in quotes if q.quote_type == 'affirmation')
@@ -226,10 +211,8 @@ def sync_categories_to_file():
             with open(categories_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Находим и заменяем секцию categories_data
             pattern = r'categories_data\s*=\s*\[(.*?)\]'
             
-            # Создаем новое представление categories_data
             new_categories_str = "categories_data = [\n"
             for cat in categories_data:
                 new_categories_str += f'    {{\n'
@@ -239,13 +222,11 @@ def sync_categories_to_file():
                 new_categories_str += f'    }},\n'
             new_categories_str += ']\n'
             
-            # Заменяем в содержимом
             if re.search(pattern, content, re.DOTALL):
                 new_content = re.sub(pattern, new_categories_str.rstrip('\n'), content, flags=re.DOTALL)
             else:
                 new_content = content + '\n\n' + new_categories_str
             
-            # Сохраняем обратно
             with open(categories_file_path, 'w', encoding='utf-8') as f:
                 f.write(new_content)
             
@@ -261,7 +242,6 @@ def sync_categories_to_file():
 
 
 def sync_quotes_to_categories_file():
-    """Синхронизирует цитаты из категорий в файл categories.py без дублирования"""
     try:
         categories_file_path = 'categories.py'
         
@@ -271,10 +251,8 @@ def sync_quotes_to_categories_file():
         with open(categories_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Получаем существующие цитаты из файла, если они есть
         existing_category_quotes = {}
         
-        # Пробуем извлечь существующий CATEGORY_QUOTES
         pattern = r'CATEGORY_QUOTES\s*=\s*(\{.*?\})\n'
         match = re.search(pattern, content, re.DOTALL)
         if match:
@@ -287,7 +265,6 @@ def sync_quotes_to_categories_file():
             except:
                 pass
         
-        # Получаем все связи категорий с цитатами из БД
         category_quotes = {}
         category_relations = CategoryQuote.select()
         
@@ -297,7 +274,6 @@ def sync_quotes_to_categories_file():
                 if category.name not in category_quotes:
                     category_quotes[category.name] = []
                 
-                # Экранируем кавычки в тексте
                 escaped_text = rel.quote_text.replace('"', '\\"')
                 escaped_author = rel.quote_author.replace('"', '\\"') if rel.quote_author else ""
                 
@@ -307,7 +283,6 @@ def sync_quotes_to_categories_file():
                     "type": rel.quote_type
                 }
                 
-                # Проверяем, нет ли уже такой цитаты в существующих данных для этой категории
                 is_duplicate = False
                 if category.name in existing_category_quotes:
                     for existing_quote in existing_category_quotes[category.name]:
@@ -322,13 +297,11 @@ def sync_quotes_to_categories_file():
             except Category.DoesNotExist:
                 continue
         
-        # Добавляем существующие цитаты, которых нет в БД (чтобы не потерять)
         for cat_name, existing_quotes in existing_category_quotes.items():
             if cat_name not in category_quotes:
                 category_quotes[cat_name] = []
             
             for existing_quote in existing_quotes:
-                # Проверяем, есть ли такая цитата в БД
                 is_in_db = False
                 for rel in category_relations:
                     try:
@@ -341,9 +314,7 @@ def sync_quotes_to_categories_file():
                     except:
                         pass
                 
-                # Если цитаты нет в БД, но есть в файле - сохраняем её
                 if not is_in_db:
-                    # Проверяем, нет ли дубликата в новом списке
                     is_dup_in_new = False
                     for new_quote in category_quotes[cat_name]:
                         if (new_quote.get('text') == existing_quote.get('text') and
@@ -354,7 +325,6 @@ def sync_quotes_to_categories_file():
                     if not is_dup_in_new:
                         category_quotes[cat_name].append(existing_quote)
         
-        # Формируем новый словарь для хранения цитат по категориям
         quotes_by_category_str = "\n\n# Категории с цитатами (автоматически синхронизировано)\n"
         quotes_by_category_str += "CATEGORY_QUOTES = {\n"
         
@@ -370,7 +340,6 @@ def sync_quotes_to_categories_file():
         
         quotes_by_category_str += '}\n'
         
-        # Обновляем или добавляем секцию CATEGORY_QUOTES в файле
         pattern_full = r'CATEGORY_QUOTES\s*=\s*\{.*?\}\n'
         
         if re.search(pattern_full, content, re.DOTALL):
@@ -390,7 +359,6 @@ def sync_quotes_to_categories_file():
 
 
 def check_quote_in_any_category(quote_text, quote_type, exclude_category_id=None):
-    """Проверяет, находится ли цитата уже в какой-либо категории"""
     try:
         query = CategoryQuote.select().where(
             (CategoryQuote.quote_text == quote_text) &
