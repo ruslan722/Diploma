@@ -2821,16 +2821,16 @@ def manage_category_quotes_window(category, refresh_callback):
 
 def load_add_quotes_tab(parent, category, refresh_callback):
     
-    
+    # Внутренняя функция для получения модели по типу
     def get_model_by_type(type_str):
         if type_str == "Мотивация":
             return Motivation
         elif type_str == "Аффирмации":
             return Affirmation
-        else:  
+        else:  # Юмор
             return FunnyQuote
     
-    
+    # Создаем фильтры
     filter_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     filter_frame.pack(fill='x', pady=10)
     
@@ -2854,7 +2854,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     )
     type_combobox.pack(side='left', padx=5)
     
-
+    # Поиск
     search_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     search_frame.pack(fill='x', pady=10)
     
@@ -2881,6 +2881,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         width=100
     ).pack(side='left', padx=5)
     
+    # Фильтр по автору
     author_filter_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     author_filter_frame.pack(fill='x', pady=5)
     
@@ -2896,11 +2897,14 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         border_color=SAMURAI_GOLD,
         button_color=SAMURAI_RED,
         button_hover_color=SAMURAI_RED_HOVER,
-        width=200,
-        command=lambda x: load_quotes_list(search_entry.get().strip())
+        dropdown_fg_color=SAMURAI_PANEL,
+        dropdown_hover_color=SAMURAI_RED,
+        dropdown_text_color="white",
+        width=200
     )
     author_combo.pack(side='left', padx=5)
     
+    # Сортировка
     sort_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     sort_frame.pack(fill='x', pady=5)
     
@@ -2941,7 +2945,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
         text_color=SAMURAI_TEXT
     ).pack(side='left', padx=10)
     
-    
+    # Таблица с цитатами
     table_frame = create_samurai_frame(parent, fg_color=SAMURAI_BG)
     table_frame.pack(fill='both', expand=True, pady=10)
     
@@ -3007,6 +3011,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     )
     hint_label.pack(pady=5)
     
+    # Функция загрузки списка цитат с учетом всех фильтров
     def load_quotes_list(search_text=""):
         for item in tree.get_children():
             tree.delete(item)
@@ -3021,32 +3026,36 @@ def load_add_quotes_tab(parent, category, refresh_callback):
             elif type_key == "юмор":
                 type_key = "funny"
             
-            
+            # Получаем цитаты уже добавленные в категорию
             added_quotes = CategoryQuote.select().where(
                 CategoryQuote.category == category.id
             )
             added_texts = [q.quote_text for q in added_quotes]
             
-            
+            # Базовый запрос
             query = model.select().where(model.is_deleted == False)
             
-            
+            # Фильтр по поиску
             if search_text:
                 query = query.where(model.text.contains(search_text))
             
-            
+            # Получаем все цитаты
             quotes_list = list(query)
             
-            
+            # Обновляем список авторов для комбобокса
             if quotes_list:
-                
                 authors = set(q.author for q in quotes_list if q.author)
                 author_combo.configure(values=["Все"] + sorted(list(authors)))
             
+            # ФИЛЬТР ПО АВТОРУ (исправлено)
+            selected_author = author_var.get()
+            if selected_author != "Все":
+                quotes_list = [q for q in quotes_list if q.author == selected_author]
             
+            # Фильтр: исключаем уже добавленные
             filtered_quotes = [q for q in quotes_list if q.text not in added_texts]
             
-            
+            # Сортировка
             if sort_var.get() == "asc":
                 filtered_quotes.sort(key=lambda x: x.text)
             elif sort_var.get() == "desc":
@@ -3063,7 +3072,6 @@ def load_add_quotes_tab(parent, category, refresh_callback):
                     quote.author if quote.author else "—",
                     "Активна"
                 ))
-            
             
             if not filtered_quotes:
                 tree.insert("", "end", values=(
@@ -3082,7 +3090,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
                 ""
             ))
     
-    
+    # Отслеживаем изменения переменных
     def on_type_change(*args):
         load_quotes_list()
     
@@ -3090,7 +3098,7 @@ def load_add_quotes_tab(parent, category, refresh_callback):
     search_entry.bind("<Return>", lambda e: search_quotes())
     author_var.trace_add("write", lambda *args: load_quotes_list(search_entry.get().strip()))
     
-    
+    # Инициализация
     load_quotes_list()
 
 
@@ -3099,7 +3107,6 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
     if not selection:
         messagebox.showwarning("Выбор", "Выберите цитаты для добавления")
         return
-    
     
     def get_model_by_type(type_str):
         if type_str == "Мотивация":
@@ -3131,9 +3138,7 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             continue
         
         try:
-            
             quote = model.get_by_id(quote_id)
-            
             
             try:
                 CategoryQuote.get(
@@ -3141,22 +3146,18 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
                     (CategoryQuote.quote_text == quote.text)
                 )
                 skipped_count += 1
-                continue  
+                continue
             except CategoryQuote.DoesNotExist:
                 pass
-            
-            
             
             CategoryQuote.create(
                 category=category.id,
                 quote_type=type_key,
                 quote_text=quote.text,
                 quote_author=quote.author if quote.author else "Неизвестный",
-                added_by=current_user['username']  
+                added_by=current_user['username']
             )
             added_count += 1
-            
-            
             tree.delete(item)
             
         except Exception as e:
@@ -3164,8 +3165,6 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             errors.append(str(e))
     
     if added_count > 0:
-        
-        
         sync_quotes_to_categories_file()
         
         AdminActionLog.create(
@@ -3182,8 +3181,7 @@ def add_selected_to_category(tree, category, type_str, refresh_callback):
             message += f"❌ Ошибок: {len(errors)}"
         
         messagebox.showinfo("Результат", message)
-        
-        refresh_callback()  
+        refresh_callback()
     else:
         messagebox.showinfo("Информация", "Ни одна из выбранных цитат не была добавлена")
 
@@ -3219,7 +3217,6 @@ def remove_selected_from_category(tree, category, refresh_callback):
                 logger.error(f"Ошибка удаления из категории: {e}")
         
         if removed_count > 0:
-            
             sync_quotes_to_categories_file()
             
             AdminActionLog.create(
@@ -3238,7 +3235,6 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
         messagebox.showerror("Ошибка", "Только Сёгун может удалять цитаты из категорий")
         return
     
-    
     quotes_count = CategoryQuote.select().where(CategoryQuote.category == category.id).count()
     
     if quotes_count == 0:
@@ -3250,9 +3246,7 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
                           f"Количество цитат: {quotes_count}\n\n"
                           f"Это действие нельзя отменить."):
         try:
-            
             deleted = CategoryQuote.delete().where(CategoryQuote.category == category.id).execute()
-            
             
             sync_quotes_to_categories_file()
             
@@ -3264,8 +3258,8 @@ def remove_all_from_category(category, refresh_callback, load_quotes_callback):
             )
             
             messagebox.showinfo("Успех", f"Удалено {deleted} цитат из категории")
-            load_quotes_callback() 
-            refresh_callback()  
+            load_quotes_callback()
+            refresh_callback()
             
         except Exception as e:
             logger.error(f"Ошибка удаления всех цитат из категории: {e}")
@@ -3282,7 +3276,6 @@ def show_tooltip(event, text):
                         background=SAMURAI_PANEL, foreground="white",
                         relief='solid', borderwidth=1, font=("Segoe UI", 9))
         label.pack()
-        
         
         event.widget.tooltip = tooltip
     except:
@@ -3301,7 +3294,6 @@ def developer_window():
     if not check_auth():
         return
     
-   
     if not is_main_admin():
         messagebox.showerror("Ошибка", "Только главный Сёгун имеет доступ к панели управления")
         return
