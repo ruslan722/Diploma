@@ -1394,7 +1394,19 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
     separator = ctk.CTkFrame(root, height=2, fg_color=SAMURAI_GOLD, corner_radius=0)
     separator.pack(fill='x', side='top', pady=(0, 10))
     
-    content_frame = ctk.CTkFrame(root, fg_color=SAMURAI_BG)
+    # 🔧 ИСПРАВЛЕНИЕ: Добавляем SCROLLABLE контейнер вместо обычного
+    main_scroll_frame = ctk.CTkScrollableFrame(
+        root,
+        fg_color=SAMURAI_BG,
+        scrollbar_button_color=SAMURAI_RED,
+        scrollbar_button_hover_color=SAMURAI_RED_HOVER,
+        scrollbar_fg_color=SAMURAI_PANEL,
+        corner_radius=0,
+        label_fg_color=SAMURAI_BG
+    )
+    main_scroll_frame.pack(fill='both', expand=True, padx=0, pady=0)
+    
+    content_frame = ctk.CTkFrame(main_scroll_frame, fg_color=SAMURAI_BG)
     content_frame.pack(fill='both', expand=True)
     
     
@@ -1583,8 +1595,17 @@ def show_quote_window(quote_type, title, ModelClass, active_tab=None):
         create_samurai_button(nav_controls_frame, ">", next_quote, width=50, height=40,
                              font=("Arial", 16, "bold")).pack(side='left', padx=20)
         
-        create_samurai_button(slider_frame, "🎲 Случайная мудрость", show_random_quote,
-                             color=SAMURAI_PANEL, hover_color="#333", width=200).pack(pady=(0, 20))
+        random_btn = create_samurai_button(
+            slider_frame, 
+            "🎲 Случайная цитата",
+            show_random_quote,
+            color=SAMURAI_PANEL, 
+            hover_color="#333", 
+            width=280,
+            height=45,
+            font=("Segoe UI", 16, "bold")
+        )
+        random_btn.pack(pady=(10, 20))
         
         update_quote_display()
         
